@@ -321,7 +321,7 @@ export function CheckoutForm({ mode }: { mode: "baseline" | "tobe" }) {
         </button>
         <p className="mt-3 text-[10px] leading-relaxed text-smoke">
           Pembayaran disimulasikan (payment mock). Tidak ada transaksi nyata.
-          Idempotency key aktif: {formatNumber(subtotal)} — klik ganda tidak
+          Idempotency key aktif: <span className="font-mono">{checkoutKey()}</span> — klik ganda tidak
           menggandakan order.
         </p>
         <Link href="/cart" className="mt-3 block text-center text-[10px] uppercase tracking-widest2 text-smoke underline underline-offset-4">
