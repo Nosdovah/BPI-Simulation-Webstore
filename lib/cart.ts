@@ -57,7 +57,7 @@ export function checkoutKey(): string {
   const cart = readCart();
   const signature = cart.map((l) => `${l.sku}x${l.qty}`).join("|");
   const raw = `chk_${signature}`;
-  // hash sederhana, cukup untuk simulasi
+  // hash sederhana, cukup untuk satu sesi checkout
   let hash = 0;
   for (let i = 0; i < raw.length; i++) {
     hash = (hash * 31 + raw.charCodeAt(i)) | 0;

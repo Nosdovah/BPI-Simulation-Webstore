@@ -9,7 +9,7 @@ import type { ErpSnapshot } from "./types";
  * Data diambil sekali oleh `npm run erp:sync` lalu disimpan sebagai snapshot
  * ber-checksum. Ini menjaga dua hal sekaligus:
  *   1. tidak ada data hardcoded — semuanya berasal dari ERP;
- *   2. hasil run baseline vs to-be tetap deterministik (snapshot yang sama).
+ *   2. hasil render katalog tetap deterministik (snapshot yang sama).
  */
 
 export const DEFAULT_SNAPSHOT_PATH = join(

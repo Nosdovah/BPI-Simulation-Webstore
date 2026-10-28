@@ -1,10 +1,6 @@
-import { cookies } from "next/headers";
-import { MODE_COOKIE, parseMode } from "@/lib/state";
 import { CartView } from "@/components/CartView";
 
 export default function CartPage() {
-  const mode = parseMode(cookies().get(MODE_COOKIE)?.value);
-
   return (
     <div className="py-10">
       <div className="border-b border-ink/10 pb-6">
@@ -12,7 +8,7 @@ export default function CartPage() {
         <h1 className="mt-2 font-display text-4xl">Your Bag</h1>
       </div>
       <div className="mt-8">
-        <CartView mode={mode} />
+        <CartView />
       </div>
     </div>
   );

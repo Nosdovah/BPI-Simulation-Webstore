@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { checkStock, getProductDetail } from "@/lib/core";
-import { MODE_COOKIE, parseMode, pushTelemetry } from "@/lib/state";
+import { pushTelemetry } from "@/lib/state";
 
 /**
  * GET /api/catalog/stock?skus=A,B,C
- * Kontrak blueprint §5: storefront tidak menghitung stok sendiri.
+ * Storefront tidak menghitung stok sendiri — angka berasal dari core.
  */
 export async function GET(request: Request) {
-  const mode = parseMode(cookies().get(MODE_COOKIE)?.value);
   const url = new URL(request.url);
   const skus = (url.searchParams.get("skus") ?? "")
     .split(",")
@@ -17,11 +15,11 @@ export async function GET(request: Request) {
     .slice(0, 60);
 
   if (skus.length === 0) {
-    return NextResponse.json({ mode, items: [] });
+    return NextResponse.json({ items: [] });
   }
 
   const items = skus.map((sku) => {
-    const detail = getProductDetail(sku, mode);
+    const detail = getProductDetail(sku);
     if (!detail) return { sku, found: false };
     return {
       sku: detail.sku,
@@ -39,12 +37,9 @@ export async function GET(request: Request) {
     };
   });
 
-  const check = checkStock(
-    skus.map((sku) => ({ sku, qty: 1 })),
-    mode,
-  );
+  const check = checkStock(skus.map((sku) => ({ sku, qty: 1 })));
 
-  pushTelemetry({ event: "stock_check", mode, skus: skus.length });
+  pushTelemetry({ event: "stock_check", skus: skus.length });
 
-  return NextResponse.json({ mode, items, check: check.lines });
+  return NextResponse.json({ items, check: check.lines });
 }

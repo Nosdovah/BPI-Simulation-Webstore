@@ -4,7 +4,6 @@ import { resolveStockDisplay, type ComponentStockMap } from "./stock";
 import type {
   BundleComponent,
   Gender,
-  Mode,
   Product,
   ProductCard,
   ProductDetail,
@@ -13,31 +12,22 @@ import type {
 /**
  * Lapisan "osr-core" versi standalone.
  *
- * Di arsitektur penuh (BLUEPRINT_SIMULASI_v0.2) storefront memanggil core lewat
- * HTTP. Di repo ini core dijalankan in-process supaya webstore bisa berdiri
- * sendiri tanpa Docker. Kalau `OSR_CORE_URL` diisi, lib/api.ts akan memakai
- * core eksternal dan fungsi-fungsi di bawah tidak dipakai.
+ * Di arsitektur penuh storefront memanggil core lewat HTTP. Di repo ini core
+ * dijalankan in-process supaya webstore bisa berdiri sendiri tanpa Docker.
  */
 
 export function componentStocks(): ComponentStockMap {
   const map: ComponentStockMap = new Map();
   for (const p of getCatalog()) {
     if (!p.isBundle && p.materialCode) {
-      map.set(
-        p.materialCode,
-        Math.max(0, p.baselineQuota - getSold(p.materialCode)),
-      );
+      map.set(p.materialCode, Math.max(0, p.stockOnHand - getSold(p.materialCode)));
     }
   }
   return map;
 }
 
-export function toCard(
-  p: Product,
-  mode: Mode,
-  stocks: ComponentStockMap,
-): ProductCard {
-  const stock = resolveStockDisplay(p, mode, stocks);
+export function toCard(p: Product, stocks: ComponentStockMap): ProductCard {
+  const stock = resolveStockDisplay(p, stocks);
   return {
     id: p.id,
     sku: p.sku,
@@ -57,12 +47,8 @@ export function toCard(
   };
 }
 
-export function toDetail(
-  p: Product,
-  mode: Mode,
-  stocks: ComponentStockMap,
-): ProductDetail {
-  const card = toCard(p, mode, stocks);
+export function toDetail(p: Product, stocks: ComponentStockMap): ProductDetail {
+  const card = toCard(p, stocks);
   const bundleComponents: BundleComponent[] = p.components.map((c) => {
     const componentProduct = findProduct(c.materialCode);
     return {
@@ -85,7 +71,6 @@ export function toDetail(
 }
 
 export type ListParams = {
-  mode: Mode;
   gender?: Gender | "ALL";
   collection?: string;
   q?: string;
@@ -101,13 +86,11 @@ export type ListResult = {
   page: number;
   perPage: number;
   totalPages: number;
-  mode: Mode;
   generatedAt: number;
 };
 
 export function listProducts(params: ListParams): ListResult {
   const {
-    mode,
     gender = "ALL",
     collection,
     q,
@@ -145,7 +128,7 @@ export function listProducts(params: ListParams): ListResult {
   const start = (safePage - 1) * perPage;
   const slice = filtered.slice(start, start + perPage);
 
-  let items = slice.map((p) => toCard(p, mode, stocks));
+  let items = slice.map((p) => toCard(p, stocks));
   if (sort === "stock-desc") {
     items = [...items].sort((a, b) => (b.stockDisplay ?? -1) - (a.stockDisplay ?? -1));
   }
@@ -156,28 +139,24 @@ export function listProducts(params: ListParams): ListResult {
     page: safePage,
     perPage,
     totalPages,
-    mode,
     generatedAt: Date.now(),
   };
 }
 
-export function getProductDetail(
-  idOrSlug: string,
-  mode: Mode,
-): ProductDetail | null {
+export function getProductDetail(idOrSlug: string): ProductDetail | null {
   const product = findProduct(idOrSlug);
   if (!product) return null;
-  return toDetail(product, mode, componentStocks());
+  return toDetail(product, componentStocks());
 }
 
-export function featuredProducts(mode: Mode, limit = 8): ProductCard[] {
+export function featuredProducts(limit = 8): ProductCard[] {
   const stocks = componentStocks();
   const list = getCatalog();
 
   // Kurasi diturunkan dari data ERP: SKU rakitan (BOM) lebih dulu, lalu single
   // dengan sisa stok terbesar. Tidak ada SKU yang dipaku di kode.
   const available = (p: Product) =>
-    Math.max(0, p.baselineQuota - getSold(p.materialCode ?? p.sku));
+    Math.max(0, p.stockOnHand - getSold(p.materialCode ?? p.sku));
 
   const bundles = list.filter((p) => p.isBundle && p.components.length > 0);
   const singles = list
@@ -186,7 +165,7 @@ export function featuredProducts(mode: Mode, limit = 8): ProductCard[] {
     .sort((a, b) => available(b) - available(a));
 
   const picks = [...bundles, ...singles].slice(0, limit);
-  return picks.map((p) => toCard(p, mode, stocks));
+  return picks.map((p) => toCard(p, stocks));
 }
 
 export type StockCheckLine = {
@@ -197,10 +176,10 @@ export type StockCheckLine = {
   error: string | null;
 };
 
-export function checkStock(
-  lines: Array<{ sku: string; qty: number }>,
-  mode: Mode,
-): { lines: StockCheckLine[]; ok: boolean } {
+export function checkStock(lines: Array<{ sku: string; qty: number }>): {
+  lines: StockCheckLine[];
+  ok: boolean;
+} {
   const stocks = componentStocks();
   const products = findProductsBySkus(lines.map((l) => l.sku));
 
@@ -209,7 +188,7 @@ export function checkStock(
     if (!product) {
       return { sku: line.sku, requested: line.qty, available: null, ok: false, error: "SKU tidak ditemukan" };
     }
-    const resolved = resolveStockDisplay(product, mode, stocks);
+    const resolved = resolveStockDisplay(product, stocks);
     if (resolved.error) {
       return { sku: line.sku, requested: line.qty, available: null, ok: false, error: resolved.error };
     }
@@ -229,24 +208,12 @@ export function checkStock(
   return { lines: result, ok: result.every((l) => l.ok) };
 }
 
-export function catalogStats(mode: Mode) {
+export function catalogStats() {
   const list = getCatalog();
-  const stocks = componentStocks();
   const bundles = list.filter((p) => p.isBundle);
-  let phantom = 0;
-  let phantomSkus = 0;
-  for (const b of bundles) {
-    const resolved = resolveStockDisplay(b, mode, stocks);
-    if (resolved.value !== null && b.baselineQuota > resolved.value) {
-      phantom += b.baselineQuota - resolved.value;
-      phantomSkus += 1;
-    }
-  }
   return {
     totalSkus: list.length,
     singles: list.length - bundles.length,
     bundles: bundles.length,
-    phantomUnits: phantom,
-    phantomSkus,
   };
 }

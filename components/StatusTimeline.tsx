@@ -12,9 +12,7 @@ type TimelineEntry = {
 
 export type OrderSnapshot = {
   ref: string;
-  mode: "baseline" | "tobe";
   status: string;
-  stuck: boolean;
   note: string | null;
   trackingNo: string | null;
   actorLast: "SYSTEM" | "STAFF";
@@ -41,7 +39,6 @@ export function StatusTimeline({
   compact?: boolean;
 }) {
   const [snap, setSnap] = useState(initial);
-  const [busy, setBusy] = useState(false);
   const [live, setLive] = useState(true);
 
   useEffect(() => {
@@ -62,34 +59,12 @@ export function StatusTimeline({
     return () => window.clearInterval(id);
   }, [snap.ref, token, live]);
 
-  async function manualComplete() {
-    setBusy(true);
-    try {
-      await fetch(
-        `/api/orders/${snap.ref}/manual${token ? `?k=${encodeURIComponent(token)}` : ""}`,
-        { method: "POST" },
-      );
-      setSnap((prev) => ({
-        ...prev,
-        status: "COMPLETED",
-        stuck: false,
-        actorLast: "STAFF",
-        note: "Status diubah lewat klik manual staff — bukan hasil sinkronisasi webhook.",
-      }));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[10px] uppercase tracking-widest2 text-smoke">Status pesanan</p>
-          <p className="mt-1 font-mono text-lg">
-            {snap.status}
-            {snap.stuck ? <span className="ml-2 text-[10px] text-alert">STUCK</span> : null}
-          </p>
+          <p className="mt-1 font-mono text-lg">{snap.status}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -100,7 +75,7 @@ export function StatusTimeline({
             {live ? "Live: on" : "Live: off"}
           </button>
           <span className="text-[10px] uppercase tracking-widest2 text-smoke">
-            actor: {snap.actorLast}
+            diperbarui oleh: {snap.actorLast}
           </span>
         </div>
       </div>
@@ -134,20 +109,15 @@ export function StatusTimeline({
       ) : null}
 
       {snap.note ? (
-        <div className="mt-4 border border-alert/30 bg-alert/5 p-3 text-[11px] leading-relaxed text-alert">
+        <div className="mt-4 border border-ink/15 bg-bone p-3 text-[11px] leading-relaxed text-ink/70">
           {snap.note}
         </div>
       ) : null}
 
-      {!compact && snap.mode === "baseline" && snap.stuck ? (
-        <button
-          type="button"
-          onClick={manualComplete}
-          disabled={busy}
-          className="btn-ghost mt-4"
-        >
-          {busy ? "Memproses…" : "Simulasikan klik manual staff"}
-        </button>
+      {!compact && snap.trackingNo ? (
+        <p className="mt-4 text-[10px] text-smoke">
+          Nomor resi dapat dilacak di situs kurir yang dipilih.
+        </p>
       ) : null}
     </div>
   );

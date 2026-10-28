@@ -24,7 +24,7 @@ export default function TrackPage({
         <p className="text-[10px] uppercase tracking-widest2 text-smoke">Lacak pesanan</p>
         <h1 className="mt-2 font-display text-4xl">{order.ref}</h1>
         <p className="mt-2 text-xs text-smoke">
-          Timeline diperbarui otomatis tiap 4 detik. Satu tahap = 7 detik pada simulasi.
+          Timeline diperbarui otomatis. Halaman ini menyegarkan status setiap beberapa detik.
         </p>
       </div>
 
@@ -33,9 +33,7 @@ export default function TrackPage({
           token={token}
           initial={{
             ref: order.ref,
-            mode: order.mode,
             status: derived.status,
-            stuck: derived.stuck,
             note: derived.note,
             trackingNo: derived.trackingNo,
             actorLast: order.actorLast,

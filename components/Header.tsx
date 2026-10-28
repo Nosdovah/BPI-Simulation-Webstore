@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Mode } from "@/lib/types";
 import { useCart } from "./CartProvider";
-import { ModeSwitcher } from "./ModeSwitcher";
 
 const NAV = [
   { href: "/shop", label: "Shop" },
@@ -13,26 +11,18 @@ const NAV = [
   { href: "/blog", label: "Blog" },
 ];
 
-export function Header({ mode }: { mode: Mode }) {
+export function Header() {
   const { count } = useCart();
   const pathname = usePathname();
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur">
-      <div className="sim-ribbon">
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between px-4 py-1 text-[9px] uppercase tracking-widest2 text-white">
-          <span>Simulasi — bukan toko resmi</span>
-          <span className="hidden sm:inline">
-            Octarine Sandbox · replika untuk latihan DMAIC
-          </span>
-        </div>
-      </div>
-
       <div className="border-b border-ink/10">
         <div className="mx-auto flex max-w-[1400px] items-center gap-4 px-4 py-3">
           <Link href="/" className="flex items-baseline gap-2">
-            <span className="font-display text-[26px] leading-none tracking-tight">Octarine.</span>
-            <span className="text-[8px] uppercase tracking-widest2 text-smoke">Sandbox</span>
+            <span className="font-display text-[26px] leading-none tracking-tight">
+              Octarine.
+            </span>
           </Link>
 
           <nav className="ml-6 hidden items-center gap-7 md:flex">
@@ -51,7 +41,9 @@ export function Header({ mode }: { mode: Mode }) {
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
-            <ModeSwitcher initialMode={mode} />
+            <Link href="/lacak-pesanan" className="nav-link hidden sm:inline">
+              Lacak Pesanan
+            </Link>
             <Link href="/wishlist" className="nav-link hidden sm:inline">
               Wishlist
             </Link>

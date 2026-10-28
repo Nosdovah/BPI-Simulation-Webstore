@@ -1,29 +1,11 @@
-import type { BundleComponent, Mode } from "@/lib/types";
+import type { BundleComponent } from "@/lib/types";
 import { formatNumber } from "@/lib/format";
 
 export function BundleComposition({
   components,
-  mode,
 }: {
   components: BundleComponent[];
-  mode: Mode;
 }) {
-  if (mode === "baseline") {
-    return (
-      <div className="border border-alert/30 bg-alert/5 p-4">
-        <p className="text-[10px] uppercase tracking-widest2 text-alert">
-          Komposisi tidak tersedia (baseline)
-        </p>
-        <p className="mt-2 text-xs leading-relaxed text-smoke">
-          WMS 4.1 tidak mengirim field <code className="font-mono">is_bundle</code> dan{" "}
-          <code className="font-mono">components[]</code>, sehingga webstore tidak
-          tahu SKU ini terdiri dari apa. Angka stok yang tampil adalah kuota manual
-          yang tidak pernah dihitung ulang — inilah akar overselling.
-        </p>
-      </div>
-    );
-  }
-
   if (components.length === 0) {
     return (
       <div className="border border-alert/40 bg-alert/5 p-4">
@@ -31,8 +13,8 @@ export function BundleComposition({
           Data komposisi tidak tersedia
         </p>
         <p className="mt-2 text-xs text-smoke">
-          SKU ditandai bundling tetapi komponennya kosong. Sesuai aturan blueprint
-          §5.4, UI gagal secara terang-terangan dan memblokir add-to-cart.
+          SKU ditandai sebagai paket tetapi komponennya belum lengkap. Sesuai aturan
+          katalog, pembelian paket diblokir sampai komposisinya tersedia.
         </p>
       </div>
     );
@@ -48,7 +30,7 @@ export function BundleComposition({
     <div className="border border-ink/15">
       <div className="flex items-center justify-between border-b border-ink/10 bg-bone px-4 py-2">
         <p className="text-[10px] uppercase tracking-widest2 text-ink">
-          Komposisi bundling
+          Komposisi paket
         </p>
         <p className="text-[10px] uppercase tracking-widest2 text-smoke">
           Stok paket = komponen pembatas

@@ -9,7 +9,7 @@ const PROMOS = [
   },
   {
     title: "Voucher 10K",
-    copy: "Diskon Rp 10.000 untuk transaksi pertama di sandbox ini.",
+    copy: "Diskon Rp 10.000 untuk transaksi pertama Anda.",
     cta: "/shop",
     label: "Belanja sekarang",
   },
@@ -34,8 +34,8 @@ export default function PromoPage() {
         <p className="text-[10px] uppercase tracking-widest2 text-smoke">Promo</p>
         <h1 className="mt-2 font-display text-4xl">Penawaran Berjalan</h1>
         <p className="mt-2 max-w-xl text-xs leading-relaxed text-smoke">
-          Halaman statis untuk parity visual. Tidak ada mesin promo di sandbox ini —
-          harga yang berlaku selalu harga katalog.
+          Penawaran yang sedang berjalan. Harga yang tampil di katalog adalah harga
+          akhir setelah potongan promo.
         </p>
       </div>
 
@@ -52,11 +52,11 @@ export default function PromoPage() {
       </div>
 
       <div className="mt-10 border border-ink/15 bg-bone p-5 text-[11px] leading-relaxed text-ink/75">
-        <p className="text-[10px] uppercase tracking-widest2 text-smoke">Catatan simulasi</p>
+        <p className="text-[10px] uppercase tracking-widest2 text-smoke">Ketentuan promo</p>
         <p className="mt-2">
-          Promo di situs asli memakai engine dan kupon; di sandbox ini promo hanya
-          mempengaruhi navigasi, bukan perhitungan harga. Perbedaan harga nyata yang
-          diuji adalah harga bundling (diskon 10–22% dari jumlah komponen).
+          Potongan harga paket bundling (10–22% dari jumlah harga komponen) berlaku
+          otomatis di keranjang. Satu kode voucher hanya dapat dipakai satu kali per
+          akun selama periode promo berlangsung.
         </p>
       </div>
     </div>

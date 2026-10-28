@@ -47,16 +47,6 @@ body {
   @apply mb-1 block text-[10px] uppercase tracking-widest2 text-smoke;
 }
 
-.sim-ribbon {
-  background: repeating-linear-gradient(
-    45deg,
-    #0e0e0e,
-    #0e0e0e 10px,
-    #2b2b2b 10px,
-    #2b2b2b 20px
-  );
-}
-
 .marquee-track {
   display: flex;
   width: max-content;

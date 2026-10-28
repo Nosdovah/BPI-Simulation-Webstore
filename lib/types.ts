@@ -11,8 +11,6 @@ export type Gender = string;
  */
 export type CollectionSlug = string;
 
-export type Mode = "baseline" | "tobe";
-
 export type WarehouseStock = {
   warehouseId: number;
   warehouseName: string;
@@ -45,8 +43,8 @@ export type Product = {
   isBundle: boolean;
   materialCode: string | null;
   components: Array<{ materialCode: string; multiplierQty: number }>;
-  /** Angka manual dari WMS 4.1 — TIDAK pernah dihitung ulang di baseline. */
-  baselineQuota: number;
+  /** Stok on-hand dari sistem inventori ERP untuk SKU satuan / komponen. */
+  stockOnHand: number;
   stockPerWarehouse: WarehouseStock[];
   notes: { top: string[]; heart: string[]; base: string[] };
   description: string;
@@ -87,9 +85,8 @@ export type OrderItem = {
   priceIdr: number;
 };
 
+/** Sepuluh tahap status baku. Tidak ada enum liar di luar daftar ini. */
 export type OrderStatus =
-  | "SENT"
-  | "on_process"
   | "PAID"
   | "PROCESSING"
   | "PICKING"
@@ -103,9 +100,8 @@ export type OrderStatus =
 
 export type Order = {
   ref: string;
-  wmsOrderId: string | null;
+  wmsOrderId: string;
   createdAt: number;
-  mode: Mode;
   channel: "WEBSTORE";
   customer: { name: string; phone: string; email: string };
   shipping: {

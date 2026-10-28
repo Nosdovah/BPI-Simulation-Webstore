@@ -1,9 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { Mode, Order, OrderStatus, OrderItem } from "./types";
+import type { Order, OrderStatus, OrderItem } from "./types";
 
-const SECRET = process.env.OSR_ORDER_SECRET ?? "osr-sandbox-dev-secret-2026";
+const SECRET = process.env.OSR_ORDER_SECRET ?? "osr-store-dev-secret-2026";
 
-/** Urutan status baku (10 tahap) yang dipakai mode to-be. */
+/** Urutan status baku (10 tahap). */
 export const CANONICAL_STAGES: OrderStatus[] = [
   "PAID",
   "PROCESSING",
@@ -17,7 +17,7 @@ export const CANONICAL_STAGES: OrderStatus[] = [
   "COMPLETED",
 ];
 
-/** Durasi satu tahap di simulasi (detik) — dikompres supaya demo cepat. */
+/** Interval maju satu tahap (detik) — dikompres supaya demo cepat. */
 export const STAGE_MS = 7000;
 
 function b64url(input: Buffer | string): string {
@@ -55,7 +55,7 @@ export function readOrderToken(token: string | undefined | null): Order | null {
 let counter = 0;
 
 /**
- * Store in-memory: cukup untuk demo satu instance (lokal / lambda hangat).
+ * Store in-memory: cukup untuk satu instance (lokal / lambda hangat).
  * Token bertanda tangan di URL tetap jadi sumber kebenaran kalau instance
  * berbeda, jadi order tidak pernah hilang saat di-refresh.
  */
@@ -100,8 +100,6 @@ export type TimelineEntry = {
 };
 
 const STAGE_LABEL: Record<string, string> = {
-  SENT: "SENT — status mentah dari WMS",
-  on_process: "on_process — enum tidak baku",
   PAID: "Pembayaran diterima",
   PROCESSING: "Pesanan diproses",
   PICKING: "Pengambilan barang",
@@ -117,31 +115,18 @@ const STAGE_LABEL: Record<string, string> = {
 export function deriveStatus(
   order: Order,
   now = Date.now(),
-): { status: OrderStatus; timeline: TimelineEntry[]; stuck: boolean; note: string | null; trackingNo: string | null } {
-  if (order.mode === "baseline") {
-    // Cacat yang direproduksi: order masuk sebagai SENT, sub-status on_process,
-    // dan tidak pernah maju karena status hanya berubah kalau staff klik manual.
-    const timeline: TimelineEntry[] = [
-      { status: "PAID", at: order.createdAt, done: true, current: false, label: STAGE_LABEL.PAID },
-      { status: "on_process", at: order.createdAt + 1000, done: true, current: false, label: STAGE_LABEL.on_process },
-      { status: "SENT", at: order.createdAt + 2000, done: true, current: true, label: STAGE_LABEL.SENT },
-    ];
-    return {
-      status: order.status === "COMPLETED" ? "COMPLETED" : "SENT",
-      timeline,
-      stuck: order.status !== "COMPLETED",
-      note: order.status === "COMPLETED"
-        ? "Status diselesaikan lewat klik manual staff."
-        : "Macet di SENT. Webhook balik dengan payload kosong, jadi status tidak pernah naik. Butuh klik manual staff di WMS.",
-      trackingNo: order.trackingNo,
-    };
-  }
-
+): {
+  status: OrderStatus;
+  timeline: TimelineEntry[];
+  note: string | null;
+  trackingNo: string | null;
+} {
   const elapsed = Math.max(0, now - order.createdAt);
   const index = Math.min(
     CANONICAL_STAGES.length - 1,
     Math.floor(elapsed / STAGE_MS),
   );
+
   const timeline: TimelineEntry[] = CANONICAL_STAGES.map((status, i) => ({
     status,
     at: order.createdAt + i * STAGE_MS,
@@ -153,7 +138,6 @@ export function deriveStatus(
   return {
     status: CANONICAL_STAGES[index],
     timeline,
-    stuck: false,
     note: null,
     trackingNo:
       index >= 4
@@ -164,7 +148,6 @@ export function deriveStatus(
 
 export function buildOrder(args: {
   ref: string;
-  mode: Mode;
   customer: Order["customer"];
   shipping: Order["shipping"];
   items: OrderItem[];
@@ -172,21 +155,17 @@ export function buildOrder(args: {
   const subtotal = args.items.reduce((a, i) => a + i.priceIdr * i.qty, 0);
   return {
     ref: args.ref,
-    wmsOrderId: args.mode === "tobe" ? `WMS-${args.ref.split("-").pop()}` : null,
+    wmsOrderId: `WMS-${args.ref.split("-").pop()}`,
     createdAt: Date.now(),
-    mode: args.mode,
     channel: "WEBSTORE",
     customer: args.customer,
     shipping: args.shipping,
     items: args.items,
     subtotalIdr: subtotal,
     totalIdr: subtotal + args.shipping.costIdr,
-    status: args.mode === "baseline" ? "SENT" : "PAID",
+    status: "PAID",
     trackingNo: null,
-    actorLast: args.mode === "baseline" ? "STAFF" : "SYSTEM",
-    note:
-      args.mode === "baseline"
-        ? "Order dikirim ke WMS 4.2 dengan payload tanpa idempotency; status balik kosong."
-        : null,
+    actorLast: "SYSTEM",
+    note: null,
   };
 }

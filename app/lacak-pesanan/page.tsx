@@ -24,9 +24,8 @@ export default function TrackLookupPage() {
         <p className="text-[10px] uppercase tracking-widest2 text-smoke">Lacak pesanan</p>
         <h1 className="mt-2 font-display text-4xl">Cek status pesanan</h1>
         <p className="mt-2 max-w-xl text-xs leading-relaxed text-smoke">
-          Masukkan nomor pesanan (contoh: ORD-WEBSTORE-PROD-261027-1001). Pada simulasi,
-          pesanan hanya bisa dilacak dari perangkat yang membuatnya atau lewat tautan
-          bertanda tangan yang diberikan setelah checkout.
+          Masukkan nomor pesanan (contoh: ORD-WEBSTORE-PROD-261027-1001). Nomor ini
+          tercantum di email konfirmasi dan di halaman setelah checkout.
         </p>
       </div>
 
@@ -42,13 +41,11 @@ export default function TrackLookupPage() {
       {error ? <p className="mt-3 text-xs text-alert">{error}</p> : null}
 
       <div className="mt-10 max-w-xl border border-ink/15 bg-bone p-5 text-[11px] leading-relaxed text-ink/75">
-        <p className="text-[10px] uppercase tracking-widest2 text-smoke">Kenapa begini?</p>
+        <p className="text-[10px] uppercase tracking-widest2 text-smoke">Butuh bantuan?</p>
         <p className="mt-2">
-          Order disimpan sebagai token bertanda tangan di tautan, bukan di database. Ini
-          membuat sandbox bisa berjalan tanpa credential Supabase/Vercel. Untuk demo
-          multi-perangkat, sambungkan database lewat variabel lingkungan{" "}
-          <code className="font-mono">SUPABASE_URL</code> dan{" "}
-          <code className="font-mono">SUPABASE_SERVICE_ROLE_KEY</code>.
+          Kalau nomor pesanan tidak ditemukan, pastikan penulisannya sama persis dengan
+          yang tertera di konfirmasi pesanan. Untuk kendala pengiriman, sertakan nomor
+          pesanan saat menghubungi layanan pelanggan.
         </p>
       </div>
     </div>

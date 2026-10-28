@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { deriveStatus, readOrderToken, recallOrder } from "@/lib/orders";
 
-/** GET /api/orders/[ref]?k=token — status + timeline (Jalur B). */
+/** GET /api/orders/[ref]?k=token — status + timeline. */
 export async function GET(
   request: Request,
   { params }: { params: { ref: string } },
@@ -21,9 +21,7 @@ export async function GET(
 
   return NextResponse.json({
     ref: order.ref,
-    mode: order.mode,
     status: derived.status,
-    stuck: derived.stuck,
     note: derived.note,
     trackingNo: derived.trackingNo,
     actorLast: order.actorLast,

@@ -1,52 +1,96 @@
 /**
- * Verifikasi katalog tanpa menjalankan Next.
+ * Smoke test master data ERP tanpa menjalankan Next.
  * Jalankan: node scripts/verify.mjs
+ *
+ * Memeriksa integritas snapshot yang dipakai webstore: checksum, duplikat SKU,
+ * relasi BOM, stok negatif, dan kapasitas paket yang bisa dijual.
  */
-import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { readFileSync, existsSync } from "node:fs";
 
-const out = execSync(
-  "npx --yes tsx --version >/dev/null 2>&1 || true",
-  { encoding: "utf8" },
-);
-void out;
-
-// Kompilasi cepat: pakai esbuild kalau ada, kalau tidak pakai tsc sudah cukup.
-// Supaya skrip ini tidak butuh dependency tambahan, kita baca ulang konstanta
-// penting dari source dan cek konsistensinya.
-const catalogSrc = readFileSync(new URL("../lib/catalog.ts", import.meta.url), "utf8");
+const ROOT = new URL("..", import.meta.url).pathname;
+const SNAPSHOT = `${ROOT}.data/erp/catalog.snapshot.json`;
+const MANIFEST = `${ROOT}.data/erp/manifest.json`;
 
 const checks = [];
-function check(name, condition, detail = "") {
-  checks.push({ name, ok: Boolean(condition), detail });
+function check(name, ok, detail = "") {
+  checks.push({ name, ok: Boolean(ok), detail });
 }
 
+if (!existsSync(SNAPSHOT)) {
+  console.error(
+    `Snapshot tidak ditemukan di ${SNAPSHOT}\nJalankan dulu: npm run erp:sync`,
+  );
+  process.exit(1);
+}
+
+const snapshot = JSON.parse(readFileSync(SNAPSHOT, "utf8"));
+const manifest = existsSync(MANIFEST)
+  ? JSON.parse(readFileSync(MANIFEST, "utf8"))
+  : null;
+const data = snapshot.data ?? {};
+
+const products = data.products ?? [];
+const balances = data.balances ?? [];
+const boms = data.boms ?? [];
+
+check("snapshot version 1", snapshot.version === 1, `version=${snapshot.version}`);
+
 check(
-  "BUNDLE_TOTAL 3520",
-  /const BUNDLE_TOTAL = 3520;/.test(catalogSrc),
-  "3.520 bundle + 176 single = 3.696 SKU",
+  "checksum snapshot = manifest",
+  !manifest || manifest.checksum === snapshot.checksum,
+  snapshot.checksum.slice(0, 12),
+);
+
+check("ada produk", products.length > 0, `${products.length} produk`);
+
+const skus = products.map((p) => p.sku ?? p.id);
+const dupes = skus.filter((s, i) => skus.indexOf(s) !== i);
+check("SKU unik", dupes.length === 0, dupes.slice(0, 3).join(", "));
+
+const skuSet = new Set(skus);
+const orphanComponents = boms.flatMap((b) =>
+  (b.components ?? [])
+    .map((c) => c.component_sku)
+    .filter((s) => !skuSet.has(s)),
 );
 check(
-  "seed tetap",
-  /const SEED = 20260918;/.test(catalogSrc),
-  "angka katalog reproducible",
+  "semua komponen BOM ada di master",
+  orphanComponents.length === 0,
+  orphanComponents.slice(0, 3).join(", "),
 );
+
+const orphanTargets = boms
+  .map((b) => b.target_sku)
+  .filter((s) => !skuSet.has(s));
 check(
-  "M2291 = 11927",
-  /materialCode === "M2291"\) stock = 11927/.test(catalogSrc),
+  "semua target BOM ada di master",
+  orphanTargets.length === 0,
+  orphanTargets.slice(0, 3).join(", "),
 );
+
+const negative = balances.filter((b) => Number(b.available) < 0);
 check(
-  "M2292 = 10932",
-  /materialCode === "M2292"\) stock = 10932/.test(catalogSrc),
+  "tidak ada stok negatif",
+  negative.length === 0,
+  negative.slice(0, 3).map((b) => b.sku).join(", "),
 );
-check(
-  "flagship sku",
-  catalogSrc.includes("SANCTUM-NOCTIS-20ML-A1"),
-);
-check(
-  "kuota manual flagship 10932",
-  catalogSrc.includes("baseQuotaOverride = 10932"),
-);
+
+const balBySku = new Map(balances.map((b) => [b.sku, b]));
+
+const capacityReport = [];
+let capacityOk = true;
+for (const bom of boms) {
+  const legs = (bom.components ?? []).map((c) => {
+    const bal = balBySku.get(c.component_sku);
+    if (!bal) capacityOk = false;
+    const available = Number(bal?.available ?? 0);
+    const qty = Number(c.qty) || 1;
+    return Math.floor(available / qty);
+  });
+  const capacity = legs.length ? Math.min(...legs) : 0;
+  capacityReport.push(`${bom.target_sku}=${capacity}`);
+}
+check("kapasitas paket bisa dihitung", capacityOk && boms.length > 0, capacityReport.join(" "));
 
 const failed = checks.filter((c) => !c.ok);
 for (const c of checks) {
@@ -57,4 +101,4 @@ if (failed.length) {
   console.error(`\n${failed.length} pemeriksaan gagal.`);
   process.exit(1);
 }
-console.log("\nSemua pemeriksaan struktur katalog lolos.");
+console.log("\nSemua pemeriksaan integritas master data lolos.");

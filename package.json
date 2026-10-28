@@ -2,7 +2,7 @@
   "name": "bpi-simulation-webstore",
   "version": "1.0.0",
   "private": true,
-  "description": "Octarine Sandbox — replika webstore untuk simulasi DMAIC (baseline vs to-be)",
+  "description": "Webstore Octarine — katalog, pemesanan, dan pelacakan pesanan",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",

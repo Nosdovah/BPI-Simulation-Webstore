@@ -118,7 +118,7 @@ export function buildCatalogFromSnapshot(
       isBundle: true,
       materialCode: null,
       components,
-      baselineQuota: manualQuota,
+      stockOnHand: manualQuota,
       stockPerWarehouse: [],
       notes: {
         top: [bom.version ? `BOM ${bom.version}` : "BOM"],
@@ -163,7 +163,7 @@ export function buildCatalogFromSnapshot(
       isBundle: false,
       materialCode: p.sku,
       components: [],
-      baselineQuota: num(balance?.stock_on_hand ?? p.stock, 0),
+      stockOnHand: num(balance?.stock_on_hand ?? p.stock, 0),
       // ERP belum mengirim stok per gudang; sengaja dikosongkan daripada dikarang.
       stockPerWarehouse: [],
       notes: {

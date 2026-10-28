@@ -20,7 +20,7 @@ import type { OrderStatus } from "./types";
  *   { "event": "stock.updated", "event_id": "...", "occurred_at": 1699999999, "data": { ... } }
  *
  * Event yang punya efek samping di core:
- *   - stock.updated       → menambah "terjual" komponen sehingga stok bundle ikut turun (mode to-be)
+ *   - stock.updated       → menambah "terjual" komponen sehingga stok bundle ikut turun
  *   - order.status_changed→ memperbarui status/tracking order yang dikenal core
  * Event lain (catalog.updated, shipment.updated, ping) hanya dicatat + di-ack.
  */
@@ -232,8 +232,6 @@ function pruneSeen(s: WebhookState) {
 /* ------------------------------------------------------------- apply --- */
 
 const ORDER_STATUSES: OrderStatus[] = [
-  "SENT",
-  "on_process",
   "PAID",
   "PROCESSING",
   "PICKING",

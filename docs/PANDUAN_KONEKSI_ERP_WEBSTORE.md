@@ -395,7 +395,6 @@ Variabel penting di `.env.local`:
 OSR_ERP_BASE_URL=http://127.0.0.1:8100
 OSR_ERP_TOKEN=            # kosongkan kalau ERP tidak memakai service token
 OSR_CATALOG_SOURCE=snapshot
-OSR_MODE=tobe             # baseline | tobe (bisa dioverride cookie osr_mode)
 OSR_WEBHOOK_TOKEN=...     # wajib sama dengan WEBHOOK_TOKEN di ERP
 OSR_WEBHOOK_HMAC_SECRET=... # wajib sama dengan WEBHOOK_SECRET di ERP
 ```

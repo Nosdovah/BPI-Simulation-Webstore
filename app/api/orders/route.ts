@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { addSold, MODE_COOKIE, parseMode, pushTelemetry } from "@/lib/state";
+import { addSold, pushTelemetry } from "@/lib/state";
 import { findProductsBySkus, findProduct } from "@/lib/catalog";
 import { checkStock } from "@/lib/core";
 import { buildOrder, nextOrderRef, rememberOrder, signOrder } from "@/lib/orders";
@@ -29,7 +28,6 @@ const COURIER_COST: Record<string, number> = {
 };
 
 export async function POST(request: Request) {
-  const mode = parseMode(cookies().get(MODE_COOKIE)?.value);
   const body = (await request.json().catch(() => ({}))) as Payload;
 
   const rawItems = (body.items ?? []).filter(
@@ -44,13 +42,12 @@ export async function POST(request: Request) {
     );
   }
 
-  // Validasi ulang di core — bukan di UI (blueprint §6.3)
-  const check = checkStock(rawItems, mode);
+  // Validasi ulang stok di core — bukan di UI
+  const check = checkStock(rawItems);
   if (!check.ok) {
     const failed = check.lines.filter((l) => !l.ok);
     pushTelemetry({
       event: "stock_reject",
-      mode,
       code: failed.some((f) => f.error === "Data komposisi tidak tersedia")
         ? "COMPOSITION_MISSING"
         : "STOCK_CHANGED",
@@ -87,14 +84,13 @@ export async function POST(request: Request) {
   const ref = nextOrderRef();
   const order = buildOrder({
     ref,
-    mode,
     customer: {
-      name: body.customer?.name?.trim() || "Pelanggan Simulasi",
+      name: body.customer?.name?.trim() || "Pelanggan",
       phone: body.customer?.phone?.trim() || "+62 812 0000 0000",
       email: body.customer?.email?.trim() || "pelanggan@example.test",
     },
     shipping: {
-      address: body.shipping?.address?.trim() || "Jl. Simulasi No. 1",
+      address: body.shipping?.address?.trim() || "Jl. Contoh No. 1",
       city: body.shipping?.city?.trim() || "Bogor",
       postalCode: body.shipping?.postalCode?.trim() || "16111",
       courier,
@@ -104,26 +100,22 @@ export async function POST(request: Request) {
     items,
   });
 
-  // Di to-be, penjualan mengurangi stok komponen sehingga angka bundle turun.
-  // Di baseline, tidak ada pengurangan sama sekali — kuota statis tetap.
-  if (mode === "tobe") {
-    for (const item of items) {
-      const product = findProduct(item.sku);
-      if (!product) continue;
-      if (product.isBundle) {
-        for (const comp of product.components) {
-          addSold(comp.materialCode, comp.multiplierQty * item.qty);
-        }
-      } else if (product.materialCode) {
-        addSold(product.materialCode, item.qty);
+  // Penjualan mengurangi stok komponen sehingga angka paket ikut turun.
+  for (const item of items) {
+    const product = findProduct(item.sku);
+    if (!product) continue;
+    if (product.isBundle) {
+      for (const comp of product.components) {
+        addSold(comp.materialCode, comp.multiplierQty * item.qty);
       }
+    } else if (product.materialCode) {
+      addSold(product.materialCode, item.qty);
     }
   }
 
   rememberOrder(order);
   pushTelemetry({
     event: "order_created",
-    mode,
     ref: order.ref,
     total: order.totalIdr,
     items: items.length,
@@ -132,7 +124,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    mode,
     ref: order.ref,
     token: signOrder(order),
     order,

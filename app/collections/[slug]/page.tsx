@@ -1,9 +1,7 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { getCollections, getSegments } from "@/lib/catalog";
 import { listProducts } from "@/lib/core";
-import { MODE_COOKIE, parseMode } from "@/lib/state";
 import { ProductGrid } from "@/components/ProductCard";
 import { GenderFilter } from "@/components/GenderFilter";
 import { Pagination } from "@/components/Pagination";
@@ -20,12 +18,10 @@ export default function CollectionPage({
   const collection = getCollections().find((c) => c.slug === params.slug);
   if (!collection) notFound();
 
-  const mode = parseMode(cookies().get(MODE_COOKIE)?.value);
   const gender = (searchParams.gender as Gender | undefined) ?? "ALL";
   const page = Number(searchParams.page ?? "1") || 1;
 
   const result = listProducts({
-    mode,
     gender,
     collection: collection.slug,
     page,
@@ -70,7 +66,7 @@ export default function CollectionPage({
       </div>
 
       <div className="mt-8">
-        <ProductGrid products={result.items} mode={mode} />
+        <ProductGrid products={result.items} />
       </div>
 
       <Pagination

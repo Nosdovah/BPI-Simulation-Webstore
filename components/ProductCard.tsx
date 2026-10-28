@@ -1,16 +1,10 @@
 import Link from "next/link";
-import type { Mode, ProductCard as ProductCardType } from "@/lib/types";
+import type { ProductCard as ProductCardType } from "@/lib/types";
 import { formatIdr } from "@/lib/format";
 import { ProductImage } from "./ProductImage";
 import { StockBadge } from "./StockBadge";
 
-export function ProductCard({
-  product,
-  mode,
-}: {
-  product: ProductCardType;
-  mode: Mode;
-}) {
+export function ProductCard({ product }: { product: ProductCardType }) {
   return (
     <Link href={`/product/${product.sku}`} className="group block">
       <div className="relative">
@@ -42,7 +36,6 @@ export function ProductCard({
             label={product.stockLabel}
             error={product.stockError}
             aware={product.stockAware}
-            mode={mode}
           />
         </div>
       </div>
@@ -50,17 +43,11 @@ export function ProductCard({
   );
 }
 
-export function ProductGrid({
-  products,
-  mode,
-}: {
-  products: ProductCardType[];
-  mode: Mode;
-}) {
+export function ProductGrid({ products }: { products: ProductCardType[] }) {
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
       {products.map((p) => (
-        <ProductCard key={p.sku} product={p} mode={mode} />
+        <ProductCard key={p.sku} product={p} />
       ))}
     </div>
   );

@@ -23,11 +23,9 @@ export default function OrderPage({
     <div className="py-10">
       <div className="border-b border-ink/10 pb-6">
         <p className="text-[10px] uppercase tracking-widest2 text-smoke">
-          Order {order.mode === "tobe" ? "terkirim ke WMS 4.2" : "masuk dengan payload kosong"}
+          Pesanan diterima
         </p>
-        <h1 className="mt-2 font-display text-4xl">
-          {order.mode === "tobe" ? "Pesanan diterima" : "Pesanan tercatat, status belum tersinkron"}
-        </h1>
+        <h1 className="mt-2 font-display text-4xl">Terima kasih atas pesanan Anda</h1>
         <p className="mt-2 font-mono text-xs text-smoke">{order.ref}</p>
       </div>
 
@@ -38,9 +36,7 @@ export default function OrderPage({
               token={token ? decodeURIComponent(token) : undefined}
               initial={{
                 ref: order.ref,
-                mode: order.mode,
                 status: derived.status,
-                stuck: derived.stuck,
                 note: derived.note,
                 trackingNo: derived.trackingNo,
                 actorLast: order.actorLast,

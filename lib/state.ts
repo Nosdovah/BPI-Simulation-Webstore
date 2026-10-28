@@ -1,23 +1,20 @@
-import type { Mode } from "./types";
-
 /**
- * State simulasi per proses.
+ * State sesi per proses.
  *
- * Menyimpan jumlah unit komponen yang "terjual" selama sesi demo, sehingga
- * stok bundle bisa turun di mode to-be sementara kuota statis di baseline
- * tidak bergerak. In-memory (bukan database) supaya repo ini bisa jalan tanpa
- * credential apa pun; reset lewat panel /admin/simulasi.
+ * Menyimpan jumlah unit komponen yang sudah terjual selama server hidup,
+ * sehingga stok paket ikut turun setiap komponen terjual. In-memory (bukan
+ * database) supaya repo ini bisa jalan tanpa credential apa pun.
  */
 
-type SimState = {
+type SessionState = {
   soldByMaterial: Map<string, number>;
   startedAt: number;
   telemetry: Array<Record<string, unknown>>;
 };
 
-const globalRef = globalThis as unknown as { __osrState?: SimState };
+const globalRef = globalThis as unknown as { __osrState?: SessionState };
 
-function state(): SimState {
+function state(): SessionState {
   if (!globalRef.__osrState) {
     globalRef.__osrState = {
       soldByMaterial: new Map(),
@@ -58,9 +55,3 @@ export function pushTelemetry(entry: Record<string, unknown>) {
 export function readTelemetry() {
   return state().telemetry;
 }
-
-export function parseMode(raw: string | undefined | null): Mode {
-  return raw === "baseline" ? "baseline" : "tobe";
-}
-
-export const MODE_COOKIE = "osr_mode";

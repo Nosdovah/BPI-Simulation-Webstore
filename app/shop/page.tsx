@@ -1,9 +1,7 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import type { Gender } from "@/lib/types";
 import { listProducts } from "@/lib/core";
 import { getSegments } from "@/lib/catalog";
-import { MODE_COOKIE, parseMode } from "@/lib/state";
 import { ProductGrid } from "@/components/ProductCard";
 import { GenderFilter } from "@/components/GenderFilter";
 import { Pagination } from "@/components/Pagination";
@@ -25,13 +23,11 @@ const SORTS = [
 ];
 
 export default function ShopPage({ searchParams }: { searchParams: SearchParams }) {
-  const mode = parseMode(cookies().get(MODE_COOKIE)?.value);
   const gender = (searchParams.gender as Gender | undefined) ?? "ALL";
   const page = Number(searchParams.page ?? "1") || 1;
   const sort = (searchParams.sort as "featured" | "price-asc" | "price-desc" | "stock-desc") ?? "featured";
 
   const result = listProducts({
-    mode,
     gender,
     q: searchParams.q,
     page,
@@ -54,10 +50,7 @@ export default function ShopPage({ searchParams }: { searchParams: SearchParams 
           <h1 className="mt-2 font-display text-4xl">Katalog Produk</h1>
           <p className="mt-2 text-xs text-smoke">
             {formatNumber(result.total)} SKU cocok · halaman {result.page} dari{" "}
-            {result.totalPages} · mode{" "}
-            <span className="uppercase tracking-widest2">
-              {mode === "tobe" ? "to-be" : "baseline"}
-            </span>
+            {result.totalPages}
           </p>
         </div>
 
@@ -129,7 +122,7 @@ export default function ShopPage({ searchParams }: { searchParams: SearchParams 
             </Link>
           </div>
         ) : (
-          <ProductGrid products={result.items} mode={mode} />
+          <ProductGrid products={result.items} />
         )}
       </div>
 

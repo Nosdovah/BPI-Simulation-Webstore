@@ -1,30 +1,27 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { featuredProducts, catalogStats, getProductDetail } from "@/lib/core";
 import { getCatalogMeta, getCollections, flagshipSku } from "@/lib/catalog";
-import { MODE_COOKIE, parseMode } from "@/lib/state";
 import { ProductGrid } from "@/components/ProductCard";
 import { formatNumber } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
-  const mode = parseMode(cookies().get(MODE_COOKIE)?.value);
-  const featured = featuredProducts(mode, 8);
-  const stats = catalogStats(mode);
+  const featured = featuredProducts(8);
+  const stats = catalogStats();
 
   // Semua teks hero & kategori diturunkan dari master data ERP — tidak ada
   // nama produk / kategori yang dipaku di kode.
   const meta = getCatalogMeta();
   const collections = getCollections();
   const heroSku = flagshipSku();
-  const hero = heroSku ? getProductDetail(heroSku, mode) : null;
+  const hero = heroSku ? getProductDetail(heroSku) : null;
 
   const marquee = [
-    "MASTER DATA ERP // LIVE KATALOG",
+    "KOLEKSI TERBARU",
     ...collections.slice(0, 3).map((c) => `${c.title.toUpperCase()} · ${formatNumber(c.total)} SKU`),
-    `SNAPSHOT ${new Date(meta.fetchedAt).toLocaleDateString("id-ID")}`,
-    "BOM-DRIVEN STOCK ALLOCATION",
+    "STOK DIPERBARUI OTOMATIS",
+    "BUNDLING HEMAT",
   ];
 
   return (
@@ -47,15 +44,15 @@ export default function HomePage() {
           />
           <div className="relative z-10 max-w-xl px-6 py-12 sm:px-12">
             <p className="text-[10px] uppercase tracking-widest2 text-white/70">
-              Sumber data: ERP · {meta.counts.products} produk master
+              Koleksi terbaru · {formatNumber(meta.counts.products)} produk
             </p>
             <h1 className="mt-3 font-display text-4xl leading-[1.05] text-white sm:text-5xl">
               {hero ? hero.name : "Katalog belum tersedia"}
             </h1>
             <p className="mt-4 max-w-md text-xs leading-relaxed text-white/75">
-              Katalog, harga, dan stok di toko ini dibaca dari master data ERP
-              (MOAI SCM-ERP). SKU rakitan dihitung dari komposisi BOM-nya, bukan dari
-              angka kuota manual.
+              Katalog, harga, dan ketersediaan stok diperbarui otomatis dari sistem
+              inventori. Setiap paket bundling dihitung dari ketersediaan
+              komponennya, jadi jumlah yang tampil selalu bisa dikirim.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               {hero ? (
@@ -63,7 +60,7 @@ export default function HomePage() {
                   href={`/product/${encodeURIComponent(hero.sku)}`}
                   className="inline-flex items-center bg-white px-6 py-3 text-[11px] uppercase tracking-widest2 text-ink hover:bg-bone"
                 >
-                  Lihat SKU unggulan
+                  Lihat produk unggulan
                 </Link>
               ) : null}
               <Link
@@ -139,8 +136,8 @@ export default function HomePage() {
           <div>
             <h2 className="font-display text-3xl">Our Products</h2>
             <p className="mt-1 text-[10px] uppercase tracking-widest2 text-smoke">
-              {formatNumber(stats.totalSkus)} SKU · {formatNumber(stats.singles)} single ·{" "}
-              {formatNumber(stats.bundles)} bundling · checksum {meta.checksum.slice(0, 8)}
+              {formatNumber(stats.totalSkus)} SKU · {formatNumber(stats.singles)} satuan ·{" "}
+              {formatNumber(stats.bundles)} paket
             </p>
           </div>
           <Link href="/shop" className="nav-link underline underline-offset-8">
@@ -149,36 +146,31 @@ export default function HomePage() {
         </div>
 
         <div className="mt-6">
-          <ProductGrid products={featured} mode={mode} />
+          <ProductGrid products={featured} />
         </div>
       </section>
 
-      {/* SIMULATION NOTE */}
-      <section className="mt-16 border border-ink/15 bg-bone p-6">
-        <p className="text-[10px] uppercase tracking-widest2 text-smoke">
-          Catatan simulasi
-        </p>
-        <div className="mt-3 grid gap-4 text-xs leading-relaxed text-ink/80 md:grid-cols-3">
-          <p>
-            Mode <strong>baseline</strong> menampilkan kuota stok manual yang dilaporkan
-            ERP/WMS apa adanya. Angka tidak pernah turun walau komponennya terjual — di
-            sinilah <strong>{formatNumber(stats.phantomUnits)} unit phantom stock</strong>{" "}
-            muncul di {formatNumber(stats.phantomSkus)} SKU bundling.
-          </p>
-          <p>
-            Mode <strong>to-be</strong> menghitung stok bundling dari komponen pembatas
-            (<code className="font-mono">MIN(FLOOR(stok/qty))</code>) dan menampilkan
-            komposisinya.
-          </p>
-          <p>
-            Ganti mode lewat tombol <strong>Baseline / To-Be</strong> di header, lalu buka
-            SKU yang sama untuk melihat perbedaan angkanya. Panel lengkap ada di{" "}
-            <Link href="/admin/simulasi" className="underline underline-offset-4">
-              /admin/simulasi
-            </Link>
-            .
-          </p>
-        </div>
+      {/* VALUE PROPS */}
+      <section className="mt-16 grid gap-4 border border-ink/15 bg-bone p-6 sm:grid-cols-3">
+        {[
+          {
+            title: "Stok akurat",
+            body: "Angka ketersediaan mengikuti sisa komponen nyata, bukan kuota manual — tidak ada pesanan yang batal karena oversold.",
+          },
+          {
+            title: "Status transparan",
+            body: "Sepuluh tahap status pesanan diperbarui otomatis dari gudang sampai diterima.",
+          },
+          {
+            title: "Pengiriman terlacak",
+            body: "Nomor resi terbit begitu paket diserahkan ke kurir dan bisa dilacak kapan saja.",
+          },
+        ].map((item) => (
+          <div key={item.title}>
+            <p className="text-[10px] uppercase tracking-widest2 text-smoke">{item.title}</p>
+            <p className="mt-2 text-xs leading-relaxed text-ink/75">{item.body}</p>
+          </div>
+        ))}
       </section>
     </div>
   );

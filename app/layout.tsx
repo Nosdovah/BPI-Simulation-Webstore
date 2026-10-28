@@ -1,21 +1,17 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import "./globals.css";
 import { CartProvider } from "@/components/CartProvider";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Chrome";
-import { MODE_COOKIE, parseMode } from "@/lib/state";
 
 export const metadata: Metadata = {
-  title: "Octarine Sandbox — Simulasi Webstore BPI",
+  title: "Octarine — Katalog, Pemesanan, dan Pelacakan",
   description:
-    "Replika webstore untuk simulasi proyek peningkatan proses DMAIC. Data sintetis, bukan toko resmi.",
+    "Katalog produk Octarine, ketersediaan stok, dan pelacakan pesanan.",
   robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const mode = parseMode(cookies().get(MODE_COOKIE)?.value);
-
   return (
     <html lang="id">
       <head>
@@ -28,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-white text-ink antialiased">
         <CartProvider>
-          <Header mode={mode} />
+          <Header />
           <main className="mx-auto max-w-[1400px] px-4">{children}</main>
           <Footer />
         </CartProvider>

@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<title>Panduan Koneksi ERP ↔ Webstore</title>
+<style>
+@page { size: A4; margin: 16mm 14mm 18mm 14mm; }
+* { box-sizing: border-box; }
+body {
+  font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+  font-size: 9.6pt; line-height: 1.52; color: #1a1a1a; margin: 0;
+}
+h1 {
+  font-size: 20pt; color: #0b3d2e; border-bottom: 3px solid #0b3d2e;
+  padding-bottom: 6px; margin: 0 0 4px 0; letter-spacing: -0.3px;
+}
+h1 + h3 { color: #4a5a52; font-weight: 500; margin-top: 2px; font-size: 11pt; }
+h2 {
+  font-size: 13pt; color: #0b3d2e; margin: 22px 0 8px 0;
+  padding: 5px 0 5px 10px; border-left: 5px solid #c9a227;
+  background: #f4f7f5; page-break-after: avoid;
+}
+h3 { font-size: 10.5pt; color: #14513c; margin: 14px 0 5px 0; page-break-after: avoid; }
+h4 { font-size: 9.8pt; color: #333; margin: 10px 0 4px 0; }
+p { margin: 5px 0 7px 0; text-align: justify; }
+ul, ol { margin: 5px 0 8px 0; padding-left: 20px; }
+li { margin: 2px 0; }
+strong { color: #0b3d2e; }
+code {
+  font-family: "DejaVu Sans Mono", "Liberation Mono", monospace;
+  font-size: 8.4pt; background: #eef2ef; padding: 1px 4px;
+  border-radius: 3px; color: #7a2e00;
+  /* break long identifiers only when they would overflow their container */
+  overflow-wrap: break-word;
+}
+pre {
+  background: #10231c; color: #d8e6df; padding: 10px 12px;
+  border-radius: 5px; font-size: 7.3pt; line-height: 1.35;
+  page-break-inside: avoid; margin: 8px 0 10px 0;
+  border-left: 4px solid #c9a227;
+  max-width: 100%; overflow: hidden;
+}
+pre code {
+  background: none; color: inherit; padding: 0; font-size: inherit;
+  overflow-wrap: normal; word-break: normal; white-space: pre;
+}
+table {
+  border-collapse: collapse; width: 100%; max-width: 100%;
+  margin: 8px 0 12px 0; font-size: 8.2pt;
+  page-break-inside: auto;
+  table-layout: fixed;   /* hard-cap at container width; col widths come from <colgroup> */
+}
+th {
+  background: #0b3d2e; color: #fff; text-align: left;
+  padding: 5px 6px; font-weight: 600; border: 1px solid #0b3d2e;
+  overflow-wrap: anywhere; word-break: break-word;
+}
+td {
+  padding: 4px 6px; border: 1px solid #cfd8d3; vertical-align: top;
+  overflow-wrap: anywhere; word-break: break-word;
+}
+tr:nth-child(even) td { background: #f7faf8; }
+tr { page-break-inside: avoid; }
+blockquote {
+  margin: 10px 0; padding: 8px 12px; background: #fff8e1;
+  border-left: 4px solid #c9a227; font-size: 8.9pt; color: #4a3b00;
+}
+blockquote p { margin: 0; }
+hr { border: none; border-top: 1px solid #d5ddd8; margin: 16px 0; }
+em { color: #55605a; }
+</style></head><body>
+<h1 id="panduan-koneksi-erp-webstore">Panduan Koneksi ERP ↔ Webstore</h1>
+<p><strong>Proyek:</strong> OSR / Octarine Sandbox — BPI DMAIC
+<strong>Versi:</strong> 2.0 · 28 Oktober 2026
+<strong>Pasangan repo:</strong> <code>Nosdovah/BPI-Simulation-ERP</code> (engine ERP/WMS v2) ↔ <code>Nosdovah/BPI-Simulation-Webstore</code> (storefront Next.js 14)
+<strong>Status verifikasi:</strong> seluruh endpoint di §5, §6, dan §8 dijalankan ulang dan lulus pada <strong>28 Okt 2026, 10:00–10:06 WIB</strong> (02:00–02:06 UTC). Keluaran nyata dikutip apa adanya di dokumen ini.</p>
+<blockquote>
+<p><strong>Yang berubah di v2.0:</strong> bab kontrak ditulis ulang total. Dokumen v1.1 hanya mendokumentasikan <code>/api/v2/*</code> (read-model) dan menaruh Jalur B di webhook receiver saja. Kenyataannya engine ERP v2 punya <strong>dua keluarga endpoint</strong>: <code>/api/v1/*</code> untuk eksekusi (checkout, transisi status, hitung BOM, audit) dan <code>/api/v2/*</code> untuk pembacaan master data oleh storefront. Keduanya kini dijabarkan field-per-field, termasuk perbedaan bentuk envelope dan kode error. Lihat §13 untuk daftar perubahan.</p>
+<p><strong>Cakupan dokumen (wajib dibaca sebelum eksekusi):</strong> dokumen ini mendokumentasikan engine ERP pada branch <strong><code>feat/api-v1-v2-contract</code></strong> (commit <code>e611d34</code>), yaitu engine dengan <code>/api/v1/*</code> + read-model <code>/api/v2/*</code>. <code>origin/main</code> repo ERP sudah bergerak ke lineage lain — <em>replika API Perpack</em> (<code>GET /v1/products/group/page</code>, <code>GET /v1/products/list</code>, <code>POST /v1/orders/page</code>, <code>GET /v1/channels</code>, <code>GET /v1/warehouses</code>, auth JWT) — yang <strong>belum</strong> menyediakan <code>/api/v2/*</code>. Konsekuensinya: <code>npm run erp:sync</code> hanya jalan terhadap branch di atas sampai kedua lineage direkonsiliasi. Jangan menganggap main = dokumen ini.</p>
+</blockquote>
+<hr />
+<h2 id="1-ringkasan">1. Ringkasan</h2>
+<p>Integrasi terdiri dari <strong>dua jalur berlawanan arah</strong>, dan keduanya wajib jalan sebelum simulasi DMAIC dianggap valid.</p>
+<pre><code>        JALUR A — master data (ERP -&gt; Webstore, arah BACA)
+        +----------------------------+
+        |  ERP / WMS engine v2       |
+        |  apps.wms-stub  :8100      |
+        |  GET /api/v2/master/*      |
+        |  GET /api/v2/inventory/*   |
+        |  GET /api/v2/assembly/*    |
+        +-------------+--------------+
+                      |  npm run erp:sync  (tarik, snapshot)
+                      v
+        .data/erp/catalog.snapshot.json + manifest.json (checksum)
+                      |  baca tanpa network saat request
+                      v
+        +----------------------------+
+        |  Webstore Next.js  :3000   |
+        +-------------+--------------+
+                      |
+        JALUR B — order &amp; status (arah TULIS + event balik)
+                      |
+                      |  1. POST /api/v1/storefront/checkout
+                      |     -&gt; potong stok atomik + Zero-Click (paid -&gt; process)
+                      |  2. POST /api/v1/wms/orders/{ref}/transition
+                      |     -&gt; state machine + no-regression
+                      v
+        +----------------------------+
+        |  ERP state machine         |
+        |  orders / order_status_*   |
+        +-------------+--------------+
+                      |  3. webhook keluar, HMAC-SHA256
+                      |  POST /api/webhooks/wms
+                      v
+        +----------------------------+
+        |  Webstore core (receiver)  |  -&gt; dedupe -&gt; enum baku -&gt; state UI
+        +----------------------------+
+</code></pre>
+<p><strong>Pembagian peran:</strong></p>
+<ul>
+<li><strong>ERP</strong> = <em>system of record</em>: SKU, nama, segmen, harga, BOM, saldo stok, gudang, status order.</li>
+<li><strong>Webstore</strong> = konsumen data dan titik masuk pelanggan. Tidak menyimpan master data, tidak menulis stok.</li>
+<li><strong>Webstore core</strong> = penerima event <code>order.status_changed</code> / <code>stock.updated</code>, menegakkan idempotensi dan enum baku.</li>
+</ul>
+<p><strong>Aturan keras:</strong></p>
+<ol>
+<li>Webstore <strong>tidak boleh</strong> memanggil ERP di request path. Default <code>OSR_CATALOG_SOURCE=snapshot</code>; angka demo deterministik dan bisa diaudit lewat checksum.</li>
+<li>Semua mutasi stok dan status <strong>hanya</strong> lewat <code>/api/v1/*</code>. Tidak ada komponen yang menulis langsung ke SQLite.</li>
+<li>Event keluar ERP <strong>hanya</strong> lewat satu titik: <code>post_webhook()</code> di <code>apps/wms-stub/main.py</code> — supaya audit <code>webhook_delivery_log</code> lengkap dan fault injector cukup menyentuh satu tempat.</li>
+</ol>
+<hr />
+<h2 id="2-prasyarat">2. Prasyarat</h2>
+<table><colgroup><col style="width:26.43%"><col style="width:73.57%"></colgroup>
+<thead>
+<tr>
+<th>Kebutuhan</th>
+<th>Versi / catatan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python</td>
+<td>3.11 (venv di <code>~/bpi-simulation-erp/.venv</code>)</td>
+</tr>
+<tr>
+<td>Node.js</td>
+<td>18+ (webstore Next.js 14)</td>
+</tr>
+<tr>
+<td>Port</td>
+<td><code>8100</code> ERP · <code>3000</code> webstore · <code>3001</code> admin panel (opsional)</td>
+</tr>
+<tr>
+<td>Database</td>
+<td>SQLite <code>~/bpi-simulation-erp/db/wms.db</code> (di-seed, bukan dibuat manual)</td>
+</tr>
+<tr>
+<td>Network</td>
+<td>loopback saja; tidak butuh internet</td>
+</tr>
+<tr>
+<td>Env</td>
+<td><code>OSR_WEBHOOK_TOKEN</code>, <code>OSR_WEBHOOK_HMAC_SECRET</code> di webstore <code>.env.local</code>; <code>WEBHOOK_TOKEN</code>, <code>WEBHOOK_SECRET</code> di ERP</td>
+</tr>
+</tbody>
+</table>
+<p>Database <strong>tidak</strong> ikut repo (<code>db/*.db</code> di-ignore). Kalau hilang, jalankan seeder (§4).</p>
+<hr />
+<h2 id="3-menjalankan-erp">3. Menjalankan ERP</h2>
+<pre><code class="language-bash">cd ~/bpi-simulation-erp
+. .venv/bin/activate
+
+export OSR_MODE=tobe
+export WEBHOOK_URL=http://127.0.0.1:3000/api/webhooks/wms
+export WEBHOOK_SECRET=&quot;$(grep -E '^OSR_WEBHOOK_HMAC_SECRET=' \
+  ~/BPI-Simulation-Webstore/.env.local | cut -d= -f2- | tr -d '\r\n ')&quot;
+export WEBHOOK_TOKEN=&quot;$(grep -E '^OSR_WEBHOOK_TOKEN=' \
+  ~/BPI-Simulation-Webstore/.env.local | cut -d= -f2- | tr -d '\r\n ')&quot;
+
+uvicorn apps.wms-stub.main:app --host 127.0.0.1 --port 8100
+</code></pre>
+<p>Cek hidup:</p>
+<pre><code class="language-bash">curl -s http://127.0.0.1:8100/healthz
+# {&quot;ok&quot;:true,&quot;service&quot;:&quot;osr-wms (ERP Simulator v2)&quot;,&quot;mode&quot;:&quot;tobe&quot;}
+</code></pre>
+<blockquote>
+<p><code>WEBHOOK_SECRET</code> kosong <strong>tidak</strong> mematikan ERP, tetapi webhook keluar ditandatangani dengan secret default <code>osr-local-hmac-secret</code> dan akan ditolak receiver bila receiver punya secret lain. Selalu samakan nilainya.</p>
+<p><strong>Jangan</strong> menjalankan <code>main.py</code> di root repo. Itu engine v1 legacy (<code>/v1/open/*</code>, skema tabel <code>bundle_components</code>) dan akan gagal di atas skema v2 (<code>sku_bom</code>).</p>
+</blockquote>
+<hr />
+<h2 id="4-seed-per-mode-langkah-yang-paling-sering-terlewat">4. Seed per mode (langkah yang paling sering terlewat)</h2>
+<p>Mode <strong>bukan</strong> hanya flag runtime — data harus ikut di-seed. Menjalankan server <code>OSR_MODE=tobe</code> di atas database hasil seed baseline akan menghasilkan <strong>0 BOM</strong>, dan simulasi to-be tidak membuktikan apa pun.</p>
+<pre><code class="language-bash">cd ~/bpi-simulation-erp
+. .venv/bin/activate
+
+OSR_MODE=tobe python db/seed.py       # perbaikan: BOM aktif, kuota statis mati
+OSR_MODE=baseline python db/seed.py   # cacat direproduksi: BOM 0 baris, kuota manual
+</code></pre>
+<p>Seeder <strong>menghapus</strong> <code>db/wms.db</code> lalu membangun ulang. Backup dulu kalau ada state manual:</p>
+<pre><code class="language-bash">cp db/wms.db /tmp/wms.$(date +%s).bak
+</code></pre>
+<p>Keluaran nyata (mode <code>tobe</code>, 28 Okt 10:03 WIB):</p>
+<pre><code>[seed] mode=tobe | variants=3696 | stocks=7325 | sku_bom=2
+[seed] Modul A: kuota statis 10.932 vs M2291 11.927 / M2292 10.932 -&gt; phantom 995
+[seed] Modul B: 82 macet 'sent' (&gt;2hri 21) | 57 completed manual
+[seed] Modul C: 103 event | valid 20 (19.4%) | DPMO 805,825
+</code></pre>
+<p>Perbedaan mode:</p>
+<table><colgroup><col style="width:29.10%"><col style="width:34.48%"><col style="width:36.43%"></colgroup>
+<thead>
+<tr>
+<th>Aspek</th>
+<th><code>baseline</code></th>
+<th><code>tobe</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sku_bom</code></td>
+<td>0 baris</td>
+<td>2 baris (bundle ← M2291 + M2292)</td>
+</tr>
+<tr>
+<td><code>is_bundle</code></td>
+<td>0 semua</td>
+<td>1 untuk SKU bundle</td>
+</tr>
+<tr>
+<td><code>bundle_quota_manual</code></td>
+<td>1 baris (10.932)</td>
+<td>0 baris</td>
+</tr>
+<tr>
+<td>Stok bundle</td>
+<td>angka statis manual di <code>stocks</code></td>
+<td><code>MIN(floor(stok_komponen / multiplier))</code></td>
+</tr>
+<tr>
+<td><code>/api/v2/assembly/boms</code></td>
+<td><code>count: 0</code></td>
+<td><code>count: 1</code></td>
+</tr>
+<tr>
+<td><code>/api/v1/inventory/{bundle}</code></td>
+<td><code>available_stock: 0</code>, <code>components: []</code></td>
+<td><code>available_stock: 10932</code>, 2 komponen</td>
+</tr>
+<tr>
+<td>Gejala</td>
+<td>phantom stock ±995 unit (overselling)</td>
+<td>stok rakitan konsisten</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-kontrak-api-v2-dua-keluarga-endpoint">5. Kontrak API v2 — dua keluarga endpoint</h2>
+<h3 id="51-peta-keluarga-endpoint">5.1 Peta keluarga endpoint</h3>
+<table><colgroup><col style="width:13.75%"><col style="width:28.03%"><col style="width:20.83%"><col style="width:20.83%"><col style="width:16.56%"></colgroup>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Peran</th>
+<th>Implementasi</th>
+<th>Pemanggil</th>
+<th>Bentuk respons</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/v1/*</code></td>
+<td><strong>Eksekusi</strong> — hitung BOM, checkout atomik, transisi status, audit webhook</td>
+<td><code>apps/wms-stub/main.py</code></td>
+<td>storefront checkout, skrip uji, admin</td>
+<td><code>{code, msg, data}</code></td>
+</tr>
+<tr>
+<td><code>/api/v2/*</code></td>
+<td><strong>Read-model</strong> untuk storefront — master, saldo, BOM, gudang</td>
+<td><code>apps/wms-stub/compat.py</code></td>
+<td><code>lib/erp/pull.mjs</code> (<code>npm run erp:sync</code>)</td>
+<td>flat <code>{count, ...}</code></td>
+</tr>
+<tr>
+<td><code>/api/webhooks/wms</code></td>
+<td><strong>Receiver</strong> event keluar ERP</td>
+<td><code>app/api/webhooks/wms/route.ts</code> (webstore)</td>
+<td><code>post_webhook()</code> di ERP</td>
+<td><code>{ok, ...}</code></td>
+</tr>
+<tr>
+<td><code>/v1/open/*</code></td>
+<td>Panel admin legacy (ringkasan, list order, event, kuota)</td>
+<td><code>apps/wms-stub/main.py</code></td>
+<td><code>osr-admin</code> :3001</td>
+<td><code>{code, msg, data}</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Aturan pemisahan:</strong> <code>/api/v1/*</code> mengubah state (kecuali dua endpoint baca: <code>inventory/{sku}</code> dan <code>audit/webhook-logs</code>). <code>/api/v2/*</code> <strong>tidak pernah</strong> mengubah state — murni SELECT dari SQLite yang sama.</p>
+<h3 id="52-aturan-umum-dan-envelope">5.2 Aturan umum dan envelope</h3>
+<ul>
+<li>Base URL lokal: <code>http://127.0.0.1:8100</code>.</li>
+<li>Content-Type: <code>application/json</code>.</li>
+<li><strong><code>/api/v1/*</code> memakai envelope:</strong> <code>{"code":200,"msg":{"id":"Sukses","en":"Success"},"data":{...}}</code>.</li>
+<li><strong><code>/api/v2/*</code> tidak memakai envelope:</strong> respons langsung <code>{"count":N,"products":[...]}</code>.</li>
+<li>Error dari kedua keluarga memakai format bawaan FastAPI: <code>{"detail":"..."}</code> dengan status 4xx/5xx. <strong>Tidak</strong> dibungkus envelope — pemanggil wajib memeriksa HTTP status, bukan hanya <code>code</code>.</li>
+<li><strong>Pengecualian yang harus diingat:</strong> <code>POST /api/v1/storefront/checkout</code> mengembalikan objek <strong>tanpa</strong> envelope (<code>message</code>, <code>order_ref</code>, <code>status</code>, <code>updated_by</code>, <code>sla_seconds</code>). Ini sengaja (respons ringkas untuk storefront), tetapi berarti satu endpoint di keluarga v1 tidak mengikuti pola <code>code/msg/data</code>.</li>
+</ul>
+<h3 id="53-apiv1-engine-eksekusi">5.3 <code>/api/v1/*</code> — engine eksekusi</h3>
+<h4 id="a-get-apiv1inventorysku-stok-hasil-kalkulasi-bom">(a) <code>GET /api/v1/inventory/{sku}</code> — stok hasil kalkulasi BOM</h4>
+<ul>
+<li>Non-bundle: stok fisik (<code>SUM(stocks.available)</code>).</li>
+<li>Bundle: <code>MIN(floor(stok_komponen / multiplier))</code> untuk setiap komponen di <code>sku_bom</code>.</li>
+<li>Baseline: bundle tidak punya BOM → <code>available_stock: 0</code>, <code>components: []</code> (bukan angka karangan).</li>
+<li><code>404</code> bila SKU tidak ada.</li>
+</ul>
+<pre><code class="language-bash">curl -s http://127.0.0.1:8100/api/v1/inventory/Sanctum+Noctis-20ml-A1
+</code></pre>
+<pre><code class="language-json">{&quot;code&quot;:200,&quot;msg&quot;:{&quot;id&quot;:&quot;Sukses&quot;,&quot;en&quot;:&quot;Success&quot;},&quot;data&quot;:{
+  &quot;sku&quot;:&quot;Sanctum+Noctis-20ml-A1&quot;,
+  &quot;name&quot;:&quot;Sanctum + Noctis - Bundling 2 Botol 20mL&quot;,
+  &quot;is_bundle&quot;:true,
+  &quot;available_stock&quot;:10932,
+  &quot;components&quot;:[
+    {&quot;component_sku&quot;:&quot;M2291&quot;,&quot;stock_available&quot;:11927,&quot;multiplier&quot;:1},
+    {&quot;component_sku&quot;:&quot;M2292&quot;,&quot;stock_available&quot;:10932,&quot;multiplier&quot;:1}]}}
+</code></pre>
+<h4 id="b-post-apiv1storefrontcheckout-potong-stok-atomik-zero-click">(b) <code>POST /api/v1/storefront/checkout</code> — potong stok atomik + Zero-Click</h4>
+<p>Request:</p>
+<pre><code class="language-json">{&quot;order_ref&quot;:&quot;ORD-2026-0001&quot;,&quot;channel&quot;:&quot;WEBSTORE&quot;,
+ &quot;items&quot;:[{&quot;sku&quot;:&quot;M2291&quot;,&quot;qty&quot;:2}]}
+</code></pre>
+<p>Perilaku (dalam satu transaksi <code>BEGIN IMMEDIATE</code>):</p>
+<ol>
+<li>Validasi SKU; <code>404</code> kalau tidak ada.</li>
+<li>Bundle → potong <strong>komponen</strong> (<code>qty × multiplier</code>); bundle tanpa BOM → <code>409 bundle &lt;sku&gt; tanpa relasi BOM (baseline)</code>.</li>
+<li>Non-bundle → potong stok SKU itu sendiri.</li>
+<li>Insert <code>orders</code> (status <code>paid</code>, <code>paid_at</code>/<code>processing_at</code> = now) + <code>order_items</code>.</li>
+<li><strong>Zero-Click:</strong> status langsung <code>process</code> dengan <code>actor_last='SYSTEM'</code> + <code>order_status_history</code> (<code>source=CHECKOUT</code>), SLA 5 detik.</li>
+<li>Commit, lalu webhook <code>order.status_changed</code> dikirim sebagai background task.</li>
+</ol>
+<pre><code class="language-json">{&quot;message&quot;:&quot;Pesanan terbayar dan otomatis diproses ke gudang (Zero-Click).&quot;,
+ &quot;order_ref&quot;:&quot;ORD-2026-0001&quot;,&quot;status&quot;:&quot;process&quot;,&quot;updated_by&quot;:&quot;SYSTEM&quot;,&quot;sla_seconds&quot;:5.0}
+</code></pre>
+<p>Catatan: respons <strong>tidak</strong> memakai envelope dan <strong>tidak</strong> mengembalikan <code>order_id</code> internal — pakai <code>order_ref</code> sebagai kunci untuk semua langkah berikutnya.</p>
+<h4 id="c-post-apiv1wmsordersorder_reftransition-state-machine">(c) <code>POST /api/v1/wms/orders/{order_ref}/transition</code> — state machine</h4>
+<p>Query: <code>target_status</code> (wajib), <code>tracking_number</code> (opsional).</p>
+<p>Alur baku: <code>paid → process → pick → packing → packed → ready_to_pickup → sent → completed</code>.
+Terminal: <code>cancelled</code>, <code>returned</code>, <code>completed</code>.</p>
+<p>Aturan yang ditegakkan:</p>
+<table><colgroup><col style="width:38.63%"><col style="width:14.47%"><col style="width:46.90%"></colgroup>
+<thead>
+<tr>
+<th>Kondisi</th>
+<th>HTTP</th>
+<th>Body</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Status tidak dikenal (mis. <code>on_process</code>)</td>
+<td><code>422</code></td>
+<td><code>{"detail":"enum status tidak dikenal"}</code></td>
+</tr>
+<tr>
+<td>Order tidak ada</td>
+<td><code>404</code></td>
+<td><code>{"detail":"order tidak ditemukan"}</code></td>
+</tr>
+<tr>
+<td>Order sudah terminal</td>
+<td><code>409</code></td>
+<td><code>{"detail":"order terminal — immutable"}</code></td>
+</tr>
+<tr>
+<td>Status mundur (mis. <code>packed → paid</code>)</td>
+<td><code>409</code></td>
+<td><code>{"detail":"no-regression: status tidak boleh mundur"}</code></td>
+</tr>
+</tbody>
+</table>
+<p>Respons sukses:</p>
+<pre><code class="language-json">{&quot;code&quot;:200,&quot;msg&quot;:{&quot;id&quot;:&quot;Sukses&quot;,&quot;en&quot;:&quot;Success&quot;},&quot;data&quot;:{
+  &quot;order_ref&quot;:&quot;ORD-2026-0001&quot;,&quot;from&quot;:&quot;process&quot;,&quot;to&quot;:&quot;packed&quot;,
+  &quot;updated_by&quot;:&quot;SYSTEM&quot;,&quot;webhook_sent&quot;:true,&quot;webhook_status&quot;:null}}
+</code></pre>
+<p><code>webhook_status</code> bernilai <code>null</code> karena pengiriman dilakukan sebagai background task; status HTTP sebenarnya ada di <code>GET /api/v1/audit/webhook-logs</code>. <code>updated_by</code> = <code>COURIER</code> untuk <code>sent</code>/<code>completed</code>, <code>SYSTEM</code> untuk status lainnya.</p>
+<h4 id="d-get-apiv1auditwebhook-logslimit100-bukti-pengiriman-signature">(d) <code>GET /api/v1/audit/webhook-logs?limit=100</code> — bukti pengiriman + signature</h4>
+<pre><code class="language-json">{&quot;code&quot;:200,&quot;msg&quot;:{&quot;id&quot;:&quot;Sukses&quot;,&quot;en&quot;:&quot;Success&quot;},&quot;data&quot;:[
+ {&quot;id&quot;:1,&quot;event_id&quot;:&quot;evt_wms_status_20261028_100221_941&quot;,
+  &quot;event&quot;:&quot;order.status_changed&quot;,&quot;lane&quot;:&quot;4.2&quot;,&quot;attempt&quot;:1,
+  &quot;http_status&quot;:202,&quot;signature&quot;:&quot;sha256=5afbb0e74167…&quot;,
+  &quot;sent_at&quot;:&quot;2026-10-28 02:02:21&quot;}]}
+</code></pre>
+<p>Tabel sumber: <code>webhook_delivery_log</code> (<code>event_id, event, lane, attempt, http_status, signature, sent_at</code>). Ini bukti audit yang dipakai di bab hasil paper: jumlah event, status HTTP, dan tanda tangan HMAC.</p>
+<h3 id="54-apiv2-read-model-untuk-storefront">5.4 <code>/api/v2/*</code> — read-model untuk storefront</h3>
+<p>Seluruh endpoint memakai SQLite yang sama dengan engine. Hasil verifikasi 28 Okt 10:05 WIB (mode <code>tobe</code>):</p>
+<table><colgroup><col style="width:32.30%"><col style="width:44.57%"><col style="width:23.13%"></colgroup>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Field penting</th>
+<th><code>count</code> terverifikasi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /api/v2/master/products?limit=5000</code></td>
+<td><code>id, sku, name, brand, category, item_type, specs, stock, unit_price, is_assembly</code></td>
+<td><strong>3.696</strong></td>
+</tr>
+<tr>
+<td><code>GET /api/v2/inventory/balances?limit=5000</code></td>
+<td><code>sku, stock_on_hand, allocated, available, on_order, bin_code</code></td>
+<td><strong>3.664</strong></td>
+</tr>
+<tr>
+<td><code>GET /api/v2/inventory/by-warehouse</code></td>
+<td><code>sku, warehouse_id, warehouse_name, available, reserved, on_order</code></td>
+<td><strong>7.325</strong> baris stok</td>
+</tr>
+<tr>
+<td><code>GET /api/v2/assembly/boms</code></td>
+<td><code>target_sku, version, source, labor_cost, overhead_cost, components[{component_sku, qty, unit_price, scrap_pct}]</code></td>
+<td><strong>1</strong> (tobe) / <strong>0</strong> (baseline)</td>
+</tr>
+<tr>
+<td><code>GET /api/v2/assembly/bundle-stock</code></td>
+<td><code>bundle_sku, quota_static, components[], stock_from_components, phantom</code></td>
+<td><strong>0</strong> di tobe (kuota manual kosong)</td>
+</tr>
+<tr>
+<td><code>GET /api/v2/master/warehouses</code></td>
+<td><code>id, code, name, type</code></td>
+<td><strong>3</strong></td>
+</tr>
+<tr>
+<td><code>GET /api/v2/master/operational</code></td>
+<td><code>min_stock, max_stock, reorder_point</code></td>
+<td><strong>0</strong> (belum disimpan ERP)</td>
+</tr>
+</tbody>
+</table>
+<p>Catatan kontrak:</p>
+<ul>
+<li><code>products</code> memakai <code>id</code> = <code>sku</code> (webstore memetakan <code>id → sku</code>).</li>
+<li><code>brand</code> diisi segmen gender (<code>MEN</code>/<code>WOMEN</code>/<code>UNISEX</code>) karena itu yang dipakai filter UI; <code>category</code> = <code>BUNDLING</code> / <code>EAU DE PARFUM</code>.</li>
+<li>3.664 &lt; 3.696 karena 32 SKU belum punya baris stok — <strong>bukan bug</strong>; webstore menampilkan stok 0 apa adanya.</li>
+<li><code>assembly/bundle-stock</code> <strong>kosong di mode tobe</strong> karena tabel <code>bundle_quota_manual</code> memang tidak diisi. Angka phantom hanya ada di baseline; ini konsisten dengan seeder (<code>bundle_quota_manual</code> = 1 baris hanya di baseline).</li>
+<li><code>operational</code> sengaja kosong: ERP belum menyimpan parameter itu. Endpoint mengembalikan <code>count: 0</code>, bukan angka karangan.</li>
+<li><code>boms.source</code> = <code>PERPACK_API</code>, <code>version</code> = <code>BOM-v2</code>, <code>labor_cost</code>/<code>overhead_cost</code> = 0 (ERP belum memodelkan biaya tenaga kerja).</li>
+<li>Semua endpoint <code>/api/v2/*</code> menerima <code>limit</code> (products/balances: 1–50.000).</li>
+</ul>
+<h3 id="55-siapa-memanggil-apa">5.5 Siapa memanggil apa</h3>
+<pre><code>lib/erp/pull.mjs   -&gt;  GET /api/v2/master/products
+                   -&gt;  GET /api/v2/inventory/balances
+                   -&gt;  GET /api/v2/assembly/boms
+                   -&gt;  GET /api/v2/master/warehouses
+                   -&gt;  GET /api/v2/master/operational
+
+storefront checkout -&gt; POST /api/v1/storefront/checkout
+skrip uji / admin   -&gt; POST /api/v1/wms/orders/{ref}/transition
+                    -&gt; GET  /api/v1/inventory/{sku}
+                    -&gt; GET  /api/v1/audit/webhook-logs
+osr-admin :3001     -&gt; GET  /v1/open/admin/summary, /v1/open/sales-order/list,
+                             /v1/open/admin/webhook-events, /v1/open/admin/bundles
+</code></pre>
+<p><code>POST /v1/open/catalog/push</code> masih ada sebagai stub kompatibilitas; di v2 katalog <strong>tidak</strong> di-push, tetapi ditarik storefront lewat <code>/api/v2/*</code>. Responsnya: <code>{"note":"v2: katalog disajikan via GET /api/v1/inventory/{sku}","sent":true}</code>.</p>
+<h3 id="56-autentikasi">5.6 Autentikasi</h3>
+<table><colgroup><col style="width:19.01%"><col style="width:33.80%"><col style="width:47.19%"></colgroup>
+<thead>
+<tr>
+<th>Keluarga</th>
+<th>Token</th>
+<th>Perilaku terverifikasi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/v2/*</code></td>
+<td><code>OSR_ERP_SERVICE_TOKEN</code> (ERP) ↔ <code>OSR_ERP_TOKEN</code> (webstore)</td>
+<td>Kalau ERP tidak menyetel token, request tanpa header tetap <code>200</code>. Kalau disetel, wajib <code>Authorization: Bearer &lt;token&gt;</code> yang sama; selain itu <code>401 Token service ERP tidak valid</code></td>
+</tr>
+<tr>
+<td><code>/api/v1/*</code></td>
+<td>tidak ada token (loopback saja)</td>
+<td>jangan diekspos ke jaringan publik</td>
+</tr>
+<tr>
+<td><code>/api/webhooks/wms</code></td>
+<td><code>OSR_WEBHOOK_TOKEN</code> webstore ↔ <code>WEBHOOK_TOKEN</code> ERP</td>
+<td><code>202</code> diterima, <code>401</code> token/signature salah</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Uji 28 Okt: <code>curl -H "Authorization: Bearer wrong" /api/v2/master/products?limit=1</code> → <code>200</code>, karena <code>OSR_ERP_SERVICE_TOKEN</code> tidak disetel di server. Jangan menyimpulkan "token jalan" dari hasil ini — setel token di kedua sisi lalu uji ulang.</p>
+</blockquote>
+<h3 id="57-uji-cepat-seluruh-kontrak">5.7 Uji cepat seluruh kontrak</h3>
+<pre><code class="language-bash"># v1 — eksekusi
+curl -s http://127.0.0.1:8100/healthz; echo
+curl -s http://127.0.0.1:8100/api/v1/inventory/Sanctum+Noctis-20ml-A1; echo
+curl -s &quot;http://127.0.0.1:8100/api/v1/audit/webhook-logs?limit=3&quot;; echo
+
+# v2 — read-model (count harus 3696 / 3664 / 1 / 3 / 0)
+for p in &quot;master/products?limit=5000&quot; &quot;inventory/balances?limit=5000&quot; \
+         &quot;assembly/boms&quot; &quot;master/warehouses&quot; &quot;master/operational&quot;; do
+  printf &quot;%-32s &quot; &quot;$p&quot;
+  curl -s &quot;http://127.0.0.1:8100/api/v2/$p&quot; \
+    | python3 -c &quot;import sys,json;print(json.load(sys.stdin).get('count'))&quot;
+done
+</code></pre>
+<p>Keluaran nyata 28 Okt 10:05 WIB:</p>
+<pre><code>master/products?limit=5000       3696
+inventory/balances?limit=5000    3664
+assembly/boms                    1
+master/warehouses                3
+master/operational               0
+</code></pre>
+<hr />
+<h2 id="6-menarik-data-ke-webstore-sync">6. Menarik data ke webstore (sync)</h2>
+<pre><code class="language-bash">cd ~/BPI-Simulation-Webstore
+npm run erp:sync
+</code></pre>
+<p>Keluaran nyata (28 Okt, mode <code>tobe</code>):</p>
+<pre><code>✓ selesai dalam 1065 ms
+  snapshot : .data/erp/catalog.snapshot.json
+  manifest : .data/erp/manifest.json
+  checksum : f9f5c05c651d0e52…
+  counts   : 3.696 produk · 3.664 saldo · 1 BOM · 3 gudang
+  Δ data berubah sejak sync sebelumnya:
+    boms: 0 → 1
+  ✓ integritas referensial bersih
+</code></pre>
+<p>Yang dilakukan <code>scripts/erp-sync.mjs</code>:</p>
+<ol>
+<li>Tarik lima endpoint <code>/api/v2/*</code> berurutan (retry + timeout via <code>OSR_ERP_RETRIES</code> / <code>OSR_ERP_TIMEOUT_MS</code>).</li>
+<li>Hitung <strong>integritas</strong>: SKU duplikat, BOM yatim, harga kosong, stok negatif, breakdown gudang.</li>
+<li>Tulis <code>catalog.snapshot.json</code> (payload + integrity + checksum sha256) dan <code>manifest.json</code> (ringkasan + delta).</li>
+<li>Bandingkan checksum dengan snapshot lama → cetak <code>Δ</code>.</li>
+</ol>
+<p>Artefak:</p>
+<pre><code>.data/erp/
+  catalog.snapshot.json   payload penuh + checksum   (di-commit, bisa diaudit)
+  manifest.json           ringkasan tanpa payload    (di-commit)
+  *.moai.bak.json         arsip snapshot ERP lama    (jangan dipakai)
+</code></pre>
+<p>Setelah sync, restart proses webstore atau biarkan reload otomatis saat <code>mtime</code> snapshot berubah (<code>lib/erp/snapshot.ts</code>).</p>
+<hr />
+<h2 id="7-menjalankan-webstore-verifikasi">7. Menjalankan webstore &amp; verifikasi</h2>
+<pre><code class="language-bash">cd ~/BPI-Simulation-Webstore
+npm run dev       # http://127.0.0.1:3000
+</code></pre>
+<p>Variabel penting di <code>.env.local</code>:</p>
+<pre><code>OSR_ERP_BASE_URL=http://127.0.0.1:8100
+OSR_ERP_TOKEN=            # kosongkan kalau ERP tidak memakai service token
+OSR_CATALOG_SOURCE=snapshot
+OSR_MODE=tobe             # baseline | tobe (bisa dioverride cookie osr_mode)
+OSR_WEBHOOK_TOKEN=...     # wajib sama dengan WEBHOOK_TOKEN di ERP
+OSR_WEBHOOK_HMAC_SECRET=... # wajib sama dengan WEBHOOK_SECRET di ERP
+</code></pre>
+<p>Verifikasi:</p>
+<pre><code class="language-bash">curl -s &quot;http://127.0.0.1:3000/api/catalog/products?perPage=2&quot;
+# → items[0]: sku Sanctum+Noctis-20ml-A1, isBundle true,
+#   priceIdr 178000 (89.000 + 89.000 dari komponen), collection &quot;bundle&quot;
+</code></pre>
+<p>Yang harus terlihat kalau berhasil:</p>
+<ul>
+<li><code>/</code> dan <code>/shop</code> menampilkan SKU dari ERP (<code>M####</code>), bukan katalog hardcoded.</li>
+<li>SKU bundle menampilkan harga <strong>hasil hitung komponen</strong>, bukan harga simpanan.</li>
+<li><code>/admin/simulasi</code> menampilkan base URL, waktu snapshot, checksum, jumlah record, status integritas.</li>
+<li>Mode <code>tobe</code> → stok bundle bergerak saat komponen terjual. Mode <code>baseline</code> → angka diam (cacat yang direproduksi).</li>
+</ul>
+<hr />
+<h2 id="8-jalur-b-order-status-dan-webhook-keluar">8. Jalur B — order, status, dan webhook keluar</h2>
+<h3 id="81-urutan-pemanggilan">8.1 Urutan pemanggilan</h3>
+<pre><code>storefront  --POST /api/v1/storefront/checkout--&gt;  ERP  (paid -&gt; process, Zero-Click)
+ERP         --POST /api/webhooks/wms (HMAC)-----&gt;  webstore core (order.status_changed)
+admin/uji   --POST /api/v1/wms/orders/{ref}/transition--&gt; ERP (packed, sent, ...)
+ERP         --POST /api/webhooks/wms (HMAC)-----&gt;  webstore core (status berikutnya)
+</code></pre>
+<h3 id="82-kontrak-receiver-post-apiwebhookswms">8.2 Kontrak receiver: <code>POST /api/webhooks/wms</code></h3>
+<table><colgroup><col style="width:29.37%"><col style="width:70.63%"></colgroup>
+<thead>
+<tr>
+<th>Item</th>
+<th>Nilai</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Auth</td>
+<td><code>Authorization: Bearer &lt;OSR_WEBHOOK_TOKEN&gt;</code></td>
+</tr>
+<tr>
+<td>Alternatif auth</td>
+<td><code>X-OSR-Webhook-Token: &lt;token&gt;</code> atau <code>?token=</code></td>
+</tr>
+<tr>
+<td>Signature</td>
+<td><code>X-Perpack-Signature: sha256=&lt;hmac_sha256(raw_body, secret)&gt;</code> (nama kontrak v2)</td>
+</tr>
+<tr>
+<td>Alias signature</td>
+<td><code>X-OSR-Signature: sha256=&lt;...&gt;</code> (yang dibaca receiver <code>lib/webhooks.ts</code>)</td>
+</tr>
+<tr>
+<td>Dedupe</td>
+<td><code>event_id</code> → fallback <code>Idempotency-Key</code> (header ini diisi ERP = <code>event_id</code>) → fallback hash body</td>
+</tr>
+<tr>
+<td>Idempotensi</td>
+<td>kunci <code>evt:&lt;event&gt;:&lt;event_id&gt;</code> dan <code>idem:&lt;event_id&gt;</code></td>
+</tr>
+</tbody>
+</table>
+<p>Status code: <code>202</code> diterima · <code>200</code> duplikat · <code>400</code> body invalid/kosong (<code>EMPTY_BODY</code>) · <code>401</code> token/signature salah (<code>UNAUTHORIZED</code>) · <code>422</code> tanpa field <code>event</code> · <code>503</code> token server belum diset.</p>
+<p>Event yang punya efek di core:</p>
+<table><colgroup><col style="width:44.90%"><col style="width:55.10%"></colgroup>
+<thead>
+<tr>
+<th>Event</th>
+<th>Efek</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>stock.updated</code> / <code>inventory.updated</code></td>
+<td>menambah "terjual" komponen → stok bundle turun (hanya mode tobe)</td>
+</tr>
+<tr>
+<td><code>order.status_changed</code> / <code>order.updated</code></td>
+<td>memperbarui status + tracking order yang dikenal core</td>
+</tr>
+<tr>
+<td><code>ping</code> / <code>health.check</code></td>
+<td>di-ack, tanpa efek</td>
+</tr>
+</tbody>
+</table>
+<p>Event lain (mis. <code>catalog.updated</code>, <code>shipment.updated</code>) dicatat lalu di-ack.</p>
+<h3 id="83-payload-status-yang-dikirim-erp">8.3 Payload status yang dikirim ERP</h3>
+<pre><code class="language-json">{&quot;event_id&quot;:&quot;evt_wms_status_20261028_100221_941&quot;,
+ &quot;event&quot;:&quot;order.status_changed&quot;,
+ &quot;timestamp&quot;:&quot;2026-10-28T02:02:21Z&quot;,
+ &quot;data&quot;:{&quot;order_ref&quot;:&quot;DOCV2-TEST-001&quot;,&quot;wms_order_id&quot;:null,&quot;channel&quot;:&quot;WEBSTORE&quot;,
+         &quot;previous_status&quot;:&quot;paid&quot;,&quot;current_status&quot;:&quot;process&quot;,
+         &quot;ref&quot;:&quot;DOCV2-TEST-001&quot;,&quot;status&quot;:&quot;PROCESSING&quot;,
+         &quot;tracking_no&quot;:null,&quot;actor&quot;:&quot;SYSTEM&quot;,
+         &quot;courier&quot;:{&quot;name&quot;:null,&quot;service&quot;:null,&quot;tracking_number&quot;:null},
+         &quot;updated_by&quot;:&quot;SYSTEM&quot;}}
+</code></pre>
+<p>Ada <strong>dua field status</strong> dengan semantik berbeda dan keduanya wajib ada:</p>
+<ul>
+<li><code>previous_status</code> / <code>current_status</code> = enum internal ERP (<code>paid</code>, <code>process</code>, <code>pick</code>, <code>packing</code>, <code>packed</code>, <code>ready_to_pickup</code>, <code>sent</code>, <code>completed</code>, <code>cancelled</code>, <code>returned</code>).</li>
+<li><code>status</code> = enum baku receiver (<code>PAID, PROCESSING, PICKING, PACKED, HANDOVER_TO_COURIER, IN_TRANSIT, ARRIVED_AT_HUB, OUT_FOR_DELIVERY, DELIVERED, COMPLETED</code>, plus warisan baseline <code>SENT</code>, <code>on_process</code>).</li>
+</ul>
+<p>Pemetaan enum (<code>STATUS_ENUM_MAP</code> di ERP):</p>
+<table><colgroup><col style="width:48.27%"><col style="width:51.73%"></colgroup>
+<thead>
+<tr>
+<th>ERP</th>
+<th>Receiver</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>paid</code></td>
+<td><code>PAID</code></td>
+</tr>
+<tr>
+<td><code>process</code>, <code>packing</code></td>
+<td><code>PROCESSING</code></td>
+</tr>
+<tr>
+<td><code>pick</code></td>
+<td><code>PICKING</code></td>
+</tr>
+<tr>
+<td><code>packed</code></td>
+<td><code>PACKED</code></td>
+</tr>
+<tr>
+<td><code>ready_to_pickup</code></td>
+<td><code>HANDOVER_TO_COURIER</code></td>
+</tr>
+<tr>
+<td><code>sent</code></td>
+<td><code>IN_TRANSIT</code></td>
+</tr>
+<tr>
+<td><code>completed</code></td>
+<td><code>COMPLETED</code></td>
+</tr>
+<tr>
+<td><code>cancelled</code> / <code>returned</code></td>
+<td><code>CANCELLED</code> / <code>RETURNED</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>on_process</code> adalah enum <strong>tidak baku</strong> dari data produksi dan ditolak mapper (<code>UNKNOWN_ENUM</code>). Itu cacat yang direproduksi seeder, bukan sesuatu yang perlu "diperbaiki" di receiver.</p>
+</blockquote>
+<h3 id="84-hasil-uji-end-to-end-28-okt-1002-wib">8.4 Hasil uji end-to-end 28 Okt 10:02 WIB</h3>
+<pre><code>POST /api/webhooks/wms  {&quot;event&quot;:&quot;ping&quot;}                    -&gt; 202
+POST /api/v1/storefront/checkout  {M2291 x2}                -&gt; 200
+  {&quot;message&quot;:&quot;... Zero-Click.&quot;,&quot;status&quot;:&quot;process&quot;,
+   &quot;updated_by&quot;:&quot;SYSTEM&quot;,&quot;sla_seconds&quot;:5.0}
+POST /api/v1/wms/orders/&lt;ref&gt;/transition?target_status=packed -&gt; 200
+  {&quot;from&quot;:&quot;process&quot;,&quot;to&quot;:&quot;packed&quot;,&quot;webhook_sent&quot;:true,&quot;webhook_status&quot;:null}
+GET  /api/v1/audit/webhook-logs?limit=3                     -&gt; 200
+  {&quot;event&quot;:&quot;order.status_changed&quot;,&quot;lane&quot;:&quot;4.2&quot;,&quot;http_status&quot;:202,
+   &quot;signature&quot;:&quot;sha256=5afbb0e74167…&quot;}
+GET  /api/webhooks/wms?limit=3  (receiver)                  -&gt; 200
+  counters: received 6, accepted 4, duplicates 2, rejected 0, applied 2
+  event diterima dengan status &quot;PROCESSING&quot; (dipetakan dari process)
+</code></pre>
+<p>Uji negatif yang juga lulus:</p>
+<pre><code>POST transition?target_status=paid      -&gt; 409 {&quot;detail&quot;:&quot;no-regression: status tidak boleh mundur&quot;}
+POST transition?target_status=on_process-&gt; 422 {&quot;detail&quot;:&quot;enum status tidak dikenal&quot;}
+</code></pre>
+<p><strong>Catatan traceability (penting untuk bab hasil):</strong> receiver mencatat <code>apply_note: "order &lt;ref&gt; tidak dikenal di core (diabaikan)"</code> ketika <code>order_ref</code> dibuat langsung di ERP, bukan lewat checkout webstore. Artinya event tetap <strong>diterima, ditandatangani, dan tersimpan</strong>, tetapi state UI tidak berubah. Untuk demo DMAIC, order uji harus dibuat lewat checkout webstore supaya rantai bukti utuh dari klik pelanggan sampai status akhir.</p>
+<hr />
+<h2 id="9-pemetaan-field-erp-product-storefront">9. Pemetaan field ERP → <code>Product</code> storefront</h2>
+<table><colgroup><col style="width:27.50%"><col style="width:38.61%"><col style="width:33.89%"></colgroup>
+<thead>
+<tr>
+<th>Field storefront</th>
+<th>Sumber ERP</th>
+<th>Catatan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sku</code></td>
+<td><code>products.sku</code></td>
+<td>kunci utama</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>products.name</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>gender</code></td>
+<td><code>products.brand</code></td>
+<td>dipakai filter segmen</td>
+</tr>
+<tr>
+<td><code>collection</code></td>
+<td><code>products.item_type</code></td>
+<td><code>SINGLE</code> → <code>single</code>, <code>BUNDLE</code> → <code>bundle</code></td>
+</tr>
+<tr>
+<td><code>priceIdr</code></td>
+<td><code>products.unit_price</code></td>
+<td>fallback <code>wholesale_price</code></td>
+</tr>
+<tr>
+<td><code>baselineQuota</code></td>
+<td><code>balances.stock_on_hand</code></td>
+<td>angka ERP apa adanya</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>products.specs</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>isBundle</code></td>
+<td>ada di <code>boms.target_sku</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>components[]</code></td>
+<td><code>boms.components[]</code></td>
+<td><code>multiplierQty</code> = <code>qty</code></td>
+</tr>
+<tr>
+<td><code>priceIdr</code> bundle</td>
+<td>Σ(<code>unit_price</code> × <code>qty</code>) + <code>labor_cost</code> + <code>overhead_cost</code></td>
+<td>dihitung, bukan disimpan</td>
+</tr>
+</tbody>
+</table>
+<p>Tidak ada fallback yang mengarang: field kosong tampil kosong.</p>
+<hr />
+<h2 id="10-troubleshooting">10. Troubleshooting</h2>
+<table><colgroup><col style="width:32.29%"><col style="width:34.20%"><col style="width:33.51%"></colgroup>
+<thead>
+<tr>
+<th>Gejala</th>
+<th>Penyebab</th>
+<th>Perbaikan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sqlite3.OperationalError: no such table: bundle_components</code></td>
+<td>kode v1 (<code>main.py</code> root) di atas skema v2 (<code>sku_bom</code>)</td>
+<td>jalankan <code>uvicorn apps.wms-stub.main:app</code></td>
+</tr>
+<tr>
+<td><code>/api/v2/assembly/boms</code> → <code>count: 0</code> padahal <code>OSR_MODE=tobe</code></td>
+<td>database masih hasil seed baseline</td>
+<td><code>OSR_MODE=tobe python db/seed.py</code>, sync ulang</td>
+</tr>
+<tr>
+<td><code>is_bundle:false</code> di semua SKU</td>
+<td>idem</td>
+<td>idem</td>
+</tr>
+<tr>
+<td><code>/healthz</code> bilang <code>mode:baseline</code> tetapi BOM ada isinya</td>
+<td>dua proses ERP menumpuk; proses lama (baseline) yang memegang port 8100</td>
+<td><code>ss -ltnp \| grep 8100</code>, matikan PID lama, start ulang dengan env yang benar</td>
+</tr>
+<tr>
+<td><code>checkout</code> → <code>409 bundle ... tanpa relasi BOM (baseline)</code></td>
+<td>SKU bundle di DB baseline (BOM 0 baris)</td>
+<td>seed <code>tobe</code>; kalau memang menguji baseline, ini perilaku yang diharapkan</td>
+</tr>
+<tr>
+<td><code>transition</code> → <code>422 enum status tidak dikenal</code></td>
+<td>memakai enum receiver (<code>IN_TRANSIT</code>, <code>on_process</code>) di endpoint ERP</td>
+<td>pakai enum internal ERP (<code>sent</code>, <code>process</code>, …)</td>
+</tr>
+<tr>
+<td><code>transition</code> → <code>409 no-regression</code></td>
+<td>mencoba memundurkan status</td>
+<td>urutan baku hanya maju; koreksi lewat <code>cancelled</code>/<code>returned</code></td>
+</tr>
+<tr>
+<td><code>webhook_sent:true</code> tetapi UI tidak berubah</td>
+<td><code>order_ref</code> tidak dikenal core (dibuat di ERP langsung)</td>
+<td>buat order lewat checkout webstore</td>
+</tr>
+<tr>
+<td><code>webhook_sent:true</code>, <code>webhook_status:null</code></td>
+<td>pengiriman background task</td>
+<td>cek hasil sebenarnya di <code>/api/v1/audit/webhook-logs</code></td>
+</tr>
+<tr>
+<td>Webhook <code>401</code></td>
+<td><code>WEBHOOK_SECRET</code> ERP ≠ <code>OSR_WEBHOOK_HMAC_SECRET</code> receiver, atau <code>WEBHOOK_TOKEN</code> ≠ <code>OSR_WEBHOOK_TOKEN</code></td>
+<td>samakan, restart keduanya</td>
+</tr>
+<tr>
+<td><code>erp:sync</code> gagal connect</td>
+<td>ERP belum jalan / port salah</td>
+<td><code>curl :8100/healthz</code>, cek <code>OSR_ERP_BASE_URL</code></td>
+</tr>
+<tr>
+<td><code>401</code> saat sync</td>
+<td>ERP menyetel <code>OSR_ERP_SERVICE_TOKEN</code> tapi token webstore beda</td>
+<td>samakan token kedua sisi</td>
+</tr>
+<tr>
+<td><code>Δ counts</code> tidak berubah setelah reseed</td>
+<td>snapshot lama di-cache memori proses</td>
+<td>restart <code>npm run dev</code></td>
+</tr>
+<tr>
+<td>Harga bundle 0 / "komposisi tidak tersedia"</td>
+<td>BOM yatim / komponen tidak ada di master</td>
+<td>lengkapi BOM, cek <code>integrity</code> di <code>manifest.json</code></td>
+</tr>
+<tr>
+<td><code>expected object, got array</code> saat parse <code>/api/v1/*</code></td>
+<td>lupa unwrap <code>data</code></td>
+<td>keluarga v1 dibungkus <code>code/msg/data</code>; v2 tidak</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="11-checklist-go-live-simulasi">11. Checklist go-live simulasi</h2>
+<ul>
+<li>[ ] <code>db/wms.db</code> di-seed dengan mode yang benar (<code>baseline</code> untuk before, <code>tobe</code> untuk after)</li>
+<li>[ ] <code>curl :8100/healthz</code> → <code>ok:true</code>, <code>mode</code> sesuai <strong>dan</strong> cocok dengan isi DB (<code>sku_bom</code>)</li>
+<li>[ ] <code>/api/v1/inventory/{bundle}</code> → <code>available_stock</code> terhitung (tobe) / <code>0</code> (baseline)</li>
+<li>[ ] 5 endpoint <code>/api/v2/*</code> merespons; <code>count</code> = 3.696 / 3.664 / 1 / 3 / 0</li>
+<li>[ ] <code>npm run erp:sync</code> → integritas bersih, checksum tercatat</li>
+<li>[ ] <code>/api/catalog/products</code> menampilkan SKU ERP + harga rakitan hasil hitung</li>
+<li>[ ] <code>POST /api/v1/storefront/checkout</code> → <code>status:process</code>, <code>updated_by:SYSTEM</code></li>
+<li>[ ] <code>POST /api/v1/wms/orders/{ref}/transition?target_status=packed</code> → <code>webhook_sent:true</code></li>
+<li>[ ] <code>GET /api/v1/audit/webhook-logs</code> → <code>http_status:202</code> + signature tercatat</li>
+<li>[ ] Receiver: counters <code>accepted</code> naik, status terpetakan (<code>PROCESSING</code>, bukan <code>process</code>)</li>
+<li>[ ] Uji negatif: <code>409 no-regression</code>, <code>422 enum</code>, <code>401</code> webhook dengan secret salah</li>
+<li>[ ] checksum + counts + counters dicatat di log eksperimen (bukti reproducibility)</li>
+</ul>
+<hr />
+<h2 id="12-berkas-yang-terlibat">12. Berkas yang terlibat</h2>
+<p><strong>ERP</strong> (<code>~/bpi-simulation-erp</code>)</p>
+<pre><code>apps/wms-stub/main.py           engine v2: /api/v1/* (checkout, transition, inventory, audit),
+                                webhook keluar HMAC, panel admin /v1/open/*
+apps/wms-stub/compat.py         read-model /api/v2/* untuk storefront
+db/schema.sql                   skema SQLite (variants, sku_bom, stocks, orders, ...)
+db/seed.py                      seeder per mode (baseline | tobe)
+scenario/reproduce_baseline.py  verifikasi angka baseline
+</code></pre>
+<p><strong>Webstore</strong> (<code>~/BPI-Simulation-Webstore</code>)</p>
+<pre><code>lib/erp/pull.mjs         puller HTTP /api/v2/* (retry, timeout, integrity, checksum)
+lib/erp/snapshot.ts      cache + reload saat mtime berubah
+lib/erp/mapper.ts        ERP -&gt; Product[]
+lib/webhooks.ts          receiver: auth, HMAC, dedupe, mapper enum
+app/api/webhooks/wms/    route GET (probe/counter) + POST (event masuk)
+scripts/erp-sync.mjs     CLI npm run erp:sync
+docs/                    dokumen integrasi (katalog, webhook, panduan ini)
+</code></pre>
+<hr />
+<h2 id="13-changelog">13. Changelog</h2>
+<p><strong>v2.0 — 28 Okt 2026</strong></p>
+<ul>
+<li>Bab kontrak ditulis ulang total menjadi §5 dengan pemisahan eksplisit <code>/api/v1/*</code> (eksekusi) vs <code>/api/v2/*</code> (read-model).</li>
+<li>Ditambahkan 7 endpoint <code>/api/v2/*</code> (v1.1 hanya 5) termasuk <code>inventory/by-warehouse</code> dan <code>assembly/bundle-stock</code>.</li>
+<li>Ditambahkan detail 4 endpoint <code>/api/v1/*</code> beserta kode error <code>404/409/422</code> yang terverifikasi.</li>
+<li>Didokumentasikan perbedaan envelope (<code>code/msg/data</code> vs flat) dan pengecualian <code>storefront/checkout</code>.</li>
+<li>Jalur B diperluas: bukan hanya webhook receiver, tetapi urutan checkout → transition → webhook, plus tabel pemetaan enum.</li>
+<li>Ditambahkan catatan traceability <code>order ... tidak dikenal di core (diabaikan)</code>.</li>
+<li>Troubleshooting ditambah 5 baris (mode/DB mismatch, port ganda, enum tertukar, unwrap <code>data</code>, 401 webhook).</li>
+<li>Semua angka dan keluaran curl diperbarui dari eksekusi 28 Okt 2026 10:00–10:06 WIB.</li>
+</ul>
+<p><strong>v1.1 — 28 Okt 2026</strong></p>
+<ul>
+<li>Menggantikan <code>INTEGRASI_ERP_CATALOG.md</code> v1.0 yang masih mengarah ke MOAI SCM-ERP (<code>scm-erp-pied.vercel.app</code>).</li>
+</ul>
+<hr />
+<p><em>Dokumen ini menggantikan <code>INTEGRASI_ERP_CATALOG.md</code> v1.0 (MOAI SCM-ERP) dan <code>PANDUAN_KONEKSI_ERP_WEBSTORE.md</code> v1.1. Sumber data: engine ERP simulasi lokal <code>apps/wms-stub</code>, bukan MOAI.</em></p>
+</body></html>

@@ -1,4 +1,4 @@
-import type { Mode, Product } from "./types";
+import type { Product } from "./types";
 import { getSold } from "./state";
 
 export type ResolvedStock = {
@@ -6,7 +6,7 @@ export type ResolvedStock = {
   label: string | null;
   aware: boolean;
   error: string | null;
-  /** true kalau angka ini dihitung dari komponen, bukan kuota manual */
+  /** true kalau angka ini dihitung dari komponen, bukan stok SKU itu sendiri */
   computed: boolean;
 };
 
@@ -15,29 +15,19 @@ export type ComponentStockMap = Map<string, number>;
 
 /**
  * Satu-satunya tempat logika tampilan stok hidup di sisi UI.
- * Aturan blueprint §5.4:
- *  - baseline : tampilkan kuota manual WMS apa adanya, tanpa interpretasi
- *  - tobe     : bundle dihitung dari komponen pembatas, fail loud kalau kosong
+ *
+ *  - SKU satuan  : stok on-hand dikurangi penjualan sesi
+ *  - SKU rakitan : dihitung dari komponen pembatas, gagal terang-terangan
+ *                  kalau komposisi tidak tersedia
  */
 export function resolveStockDisplay(
   p: Product,
-  mode: Mode,
   componentStocks: ComponentStockMap,
 ): ResolvedStock {
-  if (mode === "baseline") {
-    return {
-      value: p.baselineQuota,
-      label: null,
-      aware: false,
-      error: null,
-      computed: false,
-    };
-  }
-
   if (!p.isBundle) {
     const sold = p.materialCode ? getSold(p.materialCode) : 0;
     return {
-      value: Math.max(0, p.baselineQuota - sold),
+      value: Math.max(0, p.stockOnHand - sold),
       label: null,
       aware: false,
       error: null,

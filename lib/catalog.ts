@@ -43,7 +43,7 @@ export function getCatalog(): Product[] {
   return cached as Product[];
 }
 
-/** Metadata sumber data — dipakai panel simulasi untuk menampilkan jejak integrasi. */
+/** Metadata sumber data — jejak integrasi ERP (base URL, snapshot, checksum). */
 export function getCatalogMeta(): CatalogMeta {
   load();
   return cachedMeta as CatalogMeta;
@@ -115,7 +115,7 @@ export function catalogTotal(): number {
 }
 
 /**
- * SKU unggulan untuk hero & panel simulasi: bundle BOM yang komposisinya
+ * SKU unggulan untuk hero: bundle BOM yang komposisinya
  * lengkap, kalau tidak ada pakai produk pertama. Tidak ada SKU yang dipaku.
  */
 export function flagshipSku(): string | null {

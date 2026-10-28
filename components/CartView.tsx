@@ -18,7 +18,7 @@ type Resolved = {
   stockLabel?: string | null;
 };
 
-export function CartView({ mode }: { mode: "baseline" | "tobe" }) {
+export function CartView() {
   const { lines, setQty, remove, ready } = useCart();
   const [resolved, setResolved] = useState<Record<string, Resolved>>({});
   const [loading, setLoading] = useState(false);
@@ -175,10 +175,8 @@ export function CartView({ mode }: { mode: "baseline" | "tobe" }) {
         </div>
 
         <p className="mt-4 text-[10px] leading-relaxed text-smoke">
-          Mode <strong>{mode}</strong>:{" "}
-          {mode === "baseline"
-            ? "stok tidak dihitung ulang, jadi keranjang bisa lolos walau komponen sudah habis."
-            : "stok divalidasi ulang di core saat checkout; kalau berubah, order ditolak dengan kode STOCK_CHANGED."}
+          Ketersediaan stok divalidasi ulang saat checkout. Kalau stok berubah di antara
+          waktu menambah dan membayar, jumlah di keranjang akan disesuaikan.
         </p>
 
         <Link

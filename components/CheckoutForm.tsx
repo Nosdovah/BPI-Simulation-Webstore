@@ -45,7 +45,7 @@ const EMPTY: Draft = {
   service: "REG",
 };
 
-export function CheckoutForm({ mode }: { mode: "baseline" | "tobe" }) {
+export function CheckoutForm() {
   const { lines, clear, ready } = useCart();
   const router = useRouter();
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -260,12 +260,11 @@ export function CheckoutForm({ mode }: { mode: "baseline" | "tobe" }) {
 
         <section className="border border-ink/15 bg-bone p-4">
           <p className="text-[10px] uppercase tracking-widest2 text-smoke">
-            Mode: {mode === "tobe" ? "to-be" : "baseline"}
+            Setelah pembayaran
           </p>
           <p className="mt-2 text-[11px] leading-relaxed text-ink/75">
-            {mode === "baseline"
-              ? "Order dikirim ke WMS 4.2 tanpa validasi stok ulang dan tanpa idempotency. Status balik dengan payload kosong, order macet di SENT."
-              : "Core memvalidasi stok ulang, menetapkan order_ref final, dan mengirim idempotency key supaya klik dua kali tidak menggandakan order."}
+            Pesanan langsung diteruskan ke gudang dan diproses otomatis. Nomor resi
+            muncul di halaman pelacakan begitu paket diserahkan ke kurir.
           </p>
         </section>
       </div>
@@ -320,8 +319,8 @@ export function CheckoutForm({ mode }: { mode: "baseline" | "tobe" }) {
           {submitting ? "Memproses…" : `Bayar ${formatIdr(total)}`}
         </button>
         <p className="mt-3 text-[10px] leading-relaxed text-smoke">
-          Pembayaran disimulasikan (payment mock). Tidak ada transaksi nyata.
-          Idempotency key aktif: <span className="font-mono">{checkoutKey()}</span> — klik ganda tidak
+          Pembayaran diverifikasi otomatis. Idempotency key aktif:{" "}
+          <span className="font-mono">{checkoutKey()}</span> — klik ganda tidak
           menggandakan order.
         </p>
         <Link href="/cart" className="mt-3 block text-center text-[10px] uppercase tracking-widest2 text-smoke underline underline-offset-4">
