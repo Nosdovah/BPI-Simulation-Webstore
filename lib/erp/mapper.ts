@@ -95,6 +95,9 @@ export function buildCatalogFromSnapshot(
 
     const labor = num(bom.labor_cost);
     const overhead = num(bom.overhead_cost);
+    // Harga jual = komponen + tenaga kerja + overhead. compareAt hanya ditampilkan
+    // bila benar-benar lebih tinggi dari harga jual (hindari coret sama nilai).
+    const bundlePrice = rawSum > 0 ? rawSum + labor + overhead : labor + overhead;
     // Kuota manual = stok yang dilaporkan ERP untuk SKU target (bukan hasil hitung komponen).
     const manualQuota = num(
       balanceBySku.get(bom.target_sku)?.stock_on_hand ?? target?.stock,
@@ -112,8 +115,8 @@ export function buildCatalogFromSnapshot(
       sizeLabel: `Assembly ${components.length} komponen`,
       sizeMl: 0,
       kind: "BUNDLE",
-      priceIdr: rawSum > 0 ? rawSum + labor + overhead : labor + overhead,
-      compareAtIdr: rawSum > 0 ? rawSum : null,
+      priceIdr: bundlePrice,
+      compareAtIdr: rawSum > bundlePrice ? rawSum : null,
       imageKey: bom.target_sku,
       isBundle: true,
       materialCode: null,
