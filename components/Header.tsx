@@ -8,7 +8,7 @@ import { ModeSwitcher } from "./ModeSwitcher";
 
 const NAV = [
   { href: "/shop", label: "Shop" },
-  { href: "/collections/signature", label: "Collections" },
+  { href: "/collections", label: "Collections" },
   { href: "/promo", label: "Promo" },
   { href: "/blog", label: "Blog" },
 ];

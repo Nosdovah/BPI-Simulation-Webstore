@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import type { Gender } from "@/lib/types";
 import { listProducts } from "@/lib/core";
+import { getSegments } from "@/lib/catalog";
 import { MODE_COOKIE, parseMode } from "@/lib/state";
 import { ProductGrid } from "@/components/ProductCard";
 import { GenderFilter } from "@/components/GenderFilter";
@@ -50,7 +51,7 @@ export default function ShopPage({ searchParams }: { searchParams: SearchParams 
       <div className="flex flex-col gap-4 border-b border-ink/10 pb-6 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-[10px] uppercase tracking-widest2 text-smoke">Shop</p>
-          <h1 className="mt-2 font-display text-4xl">All Fragrances</h1>
+          <h1 className="mt-2 font-display text-4xl">Katalog Produk</h1>
           <p className="mt-2 text-xs text-smoke">
             {formatNumber(result.total)} SKU cocok · halaman {result.page} dari{" "}
             {result.totalPages} · mode{" "}
@@ -78,7 +79,18 @@ export default function ShopPage({ searchParams }: { searchParams: SearchParams 
       </div>
 
       <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <GenderFilter active={searchParams.gender as Gender | undefined ?? "ALL"} basePath="/shop" extraQuery={{ q: searchParams.q }} />
+        <GenderFilter
+          active={(searchParams.gender as Gender | undefined) ?? "ALL"}
+          basePath="/shop"
+          extraQuery={{ q: searchParams.q }}
+          options={getSegments()
+            .slice(0, 10)
+            .map((s) => ({
+              key: s.key,
+              label: `${s.key} (${s.total})`,
+            }))}
+          label="Brand"
+        />
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[9px] uppercase tracking-widest2 text-smoke">Urutkan</span>

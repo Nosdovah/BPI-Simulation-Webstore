@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { COLLECTIONS } from "@/lib/catalog";
+import { getCollections, getSegments } from "@/lib/catalog";
 import { listProducts } from "@/lib/core";
 import { MODE_COOKIE, parseMode } from "@/lib/state";
 import { ProductGrid } from "@/components/ProductCard";
@@ -17,7 +17,7 @@ export default function CollectionPage({
   params: { slug: string };
   searchParams: { gender?: string; page?: string };
 }) {
-  const collection = COLLECTIONS.find((c) => c.slug === params.slug);
+  const collection = getCollections().find((c) => c.slug === params.slug);
   if (!collection) notFound();
 
   const mode = parseMode(cookies().get(MODE_COOKIE)?.value);
@@ -43,7 +43,7 @@ export default function CollectionPage({
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2">
-        {COLLECTIONS.map((c) => (
+        {getCollections().map((c) => (
           <Link
             key={c.slug}
             href={`/collections/${c.slug}`}
@@ -62,6 +62,10 @@ export default function CollectionPage({
         <GenderFilter
           active={gender}
           basePath={`/collections/${collection.slug}`}
+          options={getSegments()
+            .slice(0, 8)
+            .map((s) => ({ key: s.key, label: `${s.key} (${s.total})` }))}
+          label="Brand"
         />
       </div>
 

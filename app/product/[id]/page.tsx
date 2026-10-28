@@ -67,7 +67,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               </span>
             ) : null}
             <span className="text-[10px] uppercase tracking-widest2 text-smoke">
-              {product.isBundle ? "Bundling" : `Eau de Parfum ${product.sizeMl}ml`}
+              {product.isBundle ? "SKU rakitan (BOM ERP)" : product.sizeLabel}
             </span>
           </div>
 
@@ -125,18 +125,18 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             </section>
 
             <section>
-              <h2 className="text-[10px] uppercase tracking-widest2 text-smoke">Piramida aroma</h2>
+              <h2 className="text-[10px] uppercase tracking-widest2 text-smoke">Atribut master data</h2>
               <dl className="mt-2 grid grid-cols-3 gap-4 text-xs">
                 <div>
-                  <dt className="text-smoke">Top</dt>
+                  <dt className="text-smoke">Brand</dt>
                   <dd className="mt-1">{product.notes.top.join(", ")}</dd>
                 </div>
                 <div>
-                  <dt className="text-smoke">Heart</dt>
+                  <dt className="text-smoke">Kategori</dt>
                   <dd className="mt-1">{product.notes.heart.join(", ")}</dd>
                 </div>
                 <div>
-                  <dt className="text-smoke">Base</dt>
+                  <dt className="text-smoke">Garansi</dt>
                   <dd className="mt-1">{product.notes.base.join(", ")}</dd>
                 </div>
               </dl>

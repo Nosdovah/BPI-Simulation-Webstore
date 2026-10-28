@@ -1,25 +1,34 @@
 import Link from "next/link";
 import type { Gender } from "@/lib/types";
 
-const OPTIONS: Array<{ key: Gender | "ALL"; label: string }> = [
-  { key: "ALL", label: "Semua" },
-  { key: "MEN", label: "Men" },
-  { key: "UNISEX", label: "Unisex" },
-  { key: "WOMEN", label: "Women" },
-];
+export type SegmentOption = { key: string; label: string; total?: number };
 
+/**
+ * Filter segmen (brand) — opsinya datang dari master data ERP lewat prop
+ * `options`, bukan daftar tetap di komponen.
+ */
 export function GenderFilter({
   active,
   basePath,
   extraQuery = {},
+  options,
+  label = "Segmen",
 }: {
   active: Gender | "ALL";
   basePath: string;
   extraQuery?: Record<string, string | undefined>;
+  options: SegmentOption[];
+  label?: string;
 }) {
+  const all: SegmentOption[] = [
+    { key: "ALL", label: "Semua" },
+    ...options,
+  ];
+
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {OPTIONS.map((opt) => {
+      <span className="mr-1 text-[9px] uppercase tracking-widest2 text-smoke">{label}</span>
+      {all.map((opt) => {
         const params = new URLSearchParams();
         if (opt.key !== "ALL") params.set("gender", opt.key);
         for (const [k, v] of Object.entries(extraQuery)) {

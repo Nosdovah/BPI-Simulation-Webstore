@@ -131,6 +131,11 @@ export function listProducts(params: ListParams): ListResult {
     return true;
   });
 
+  if (sort === "featured") {
+    // Urutan kurasi: rakitan lengkap → satuan → rakitan tanpa komposisi (BOM yatim).
+    const rank = (p: Product) => (p.isBundle ? (p.components.length > 0 ? 0 : 2) : 1);
+    filtered = [...filtered].sort((a, b) => rank(a) - rank(b));
+  }
   if (sort === "price-asc") filtered = [...filtered].sort((a, b) => a.priceIdr - b.priceIdr);
   if (sort === "price-desc") filtered = [...filtered].sort((a, b) => b.priceIdr - a.priceIdr);
 
@@ -168,18 +173,20 @@ export function getProductDetail(
 export function featuredProducts(mode: Mode, limit = 8): ProductCard[] {
   const stocks = componentStocks();
   const list = getCatalog();
-  // Kurasi tetap: bundle flagship + 7 single populer
-  const picks = [
-    list.find((p) => p.sku === "SANCTUM-NOCTIS-20ML-A1"),
-    list.find((p) => p.sku === "BOUJEE-FLUFF-2BTL"),
-    list.find((p) => p.sku === "SANCTUM-20ML"),
-    list.find((p) => p.sku === "NOCTIS-20ML"),
-    list.find((p) => p.sku === "ELIXIR-HOMME-20ML"),
-    list.find((p) => p.sku === "BOUJEE-20ML"),
-    list.find((p) => p.sku === "DAWN-EXT50"),
-    list.find((p) => p.sku === "DUSK-EXT50"),
-  ].filter((p): p is Product => Boolean(p));
-  return picks.slice(0, limit).map((p) => toCard(p, mode, stocks));
+
+  // Kurasi diturunkan dari data ERP: SKU rakitan (BOM) lebih dulu, lalu single
+  // dengan sisa stok terbesar. Tidak ada SKU yang dipaku di kode.
+  const available = (p: Product) =>
+    Math.max(0, p.baselineQuota - getSold(p.materialCode ?? p.sku));
+
+  const bundles = list.filter((p) => p.isBundle && p.components.length > 0);
+  const singles = list
+    .filter((p) => !p.isBundle)
+    .slice()
+    .sort((a, b) => available(b) - available(a));
+
+  const picks = [...bundles, ...singles].slice(0, limit);
+  return picks.map((p) => toCard(p, mode, stocks));
 }
 
 export type StockCheckLine = {

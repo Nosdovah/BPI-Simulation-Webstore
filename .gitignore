@@ -28,3 +28,8 @@ yarn-error.log*
 
 # vercel
 .vercel
+# runtime webhook log (jangan commit)
+/.data/*
+# kecuali snapshot master data ERP — sengaja di-commit supaya build & run
+# deterministik dan bisa diaudit lewat checksum
+!/.data/erp

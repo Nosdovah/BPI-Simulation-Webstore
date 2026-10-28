@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "erp:sync": "node scripts/erp-sync.mjs",
+    "erp:check": "node scripts/erp-sync.mjs && echo 'snapshot siap'"
   },
   "dependencies": {
     "next": "14.2.35",

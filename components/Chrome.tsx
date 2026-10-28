@@ -1,12 +1,11 @@
 import Link from "next/link";
 
 const MARQUEE_TEXT = [
-  "DISCOVER YOUR SIGNATURE SCENT",
-  "LUXURY FRAGRANCES // BEST PRICES",
-  "BUNDLING HEMAT",
-  "NEW ARRIVALS EVERY WEEK",
-  "EXCLUSIVE FRAGRANCE COLLECTIONS",
-  "CAPTIVATE WITH EVERY SPRAY",
+  "MASTER DATA ERP // LIVE KATALOG",
+  "HARGA & STOK DARI SISTEM ERP",
+  "SKU RAKITAN DIHITUNG DARI BOM",
+  "SINKRONISASI ORDER KE WMS",
+  "REPLIKA SIMULASI // BUKAN TOKO RESMI",
 ];
 
 export function Marquee() {
@@ -40,9 +39,10 @@ export function Footer() {
           <p className="font-display text-3xl">Octarine.</p>
           <p className="mt-3 max-w-sm text-xs leading-relaxed text-white/60">
             Octarine Sandbox adalah replika webstore untuk simulasi proyek
-            peningkatan proses (DMAIC). Seluruh produk, harga, stok, dan pesanan
-            di sini adalah data sintetis. Tidak ada transaksi nyata dan tidak ada
-            afiliasi dengan Octarine resmi.
+            peningkatan proses (DMAIC). Katalog, harga, dan stok dibaca dari master
+            data ERP melalui API; pesanan yang dibuat di sini tidak pernah dikirim
+            ke sistem produksi. Tidak ada transaksi nyata dan tidak ada afiliasi
+            dengan Octarine resmi.
           </p>
           <p className="mt-4 text-[10px] uppercase tracking-widest2 text-white/40">
             Simulasi — bukan toko resmi
@@ -69,7 +69,7 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-white/10 py-4 text-center text-[10px] uppercase tracking-widest2 text-white/35">
-        © 2026 Octarine Sandbox · data sintetis · seed 20260918
+        © 2026 Octarine Sandbox · data master dari ERP · mode simulasi
       </div>
     </footer>
   );

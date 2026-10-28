@@ -1,10 +1,15 @@
-export type Gender = "MEN" | "UNISEX" | "WOMEN";
+/**
+ * Segmen produk. Sebelumnya union tetap (MEN/WOMEN/UNISEX) karena katalog
+ * dibangkitkan dari daftar wangi hardcoded. Sekarang nilainya berasal dari
+ * master data ERP (dipakai: brand), jadi bertipe string.
+ */
+export type Gender = string;
 
-export type CollectionSlug =
-  | "signature"
-  | "noir"
-  | "dust-la-stella"
-  | "kadam-sidik";
+/**
+ * Koleksi produk. Diturunkan dari `item_type` master data ERP
+ * (`PREBUILT` → `prebuilt`, `BARE_BONE` → `bare-bone`, …), bukan daftar tetap.
+ */
+export type CollectionSlug = string;
 
 export type Mode = "baseline" | "tobe";
 

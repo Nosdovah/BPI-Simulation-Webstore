@@ -1,30 +1,31 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { featuredProducts, catalogStats } from "@/lib/core";
+import { featuredProducts, catalogStats, getProductDetail } from "@/lib/core";
+import { getCatalogMeta, getCollections, flagshipSku } from "@/lib/catalog";
 import { MODE_COOKIE, parseMode } from "@/lib/state";
 import { ProductGrid } from "@/components/ProductCard";
 import { formatNumber } from "@/lib/format";
 
-const CATEGORIES = [
-  { key: "MEN", label: "Men", note: "Woody · aromatic · bold" },
-  { key: "UNISEX", label: "Unisex", note: "Shared · modern · clean" },
-  { key: "WOMEN", label: "Women", note: "Floral · gourmand · soft" },
-];
-
-const MARQUEE = [
-  "DISCOVER YOUR SIGNATURE SCENT",
-  "LUXURY FRAGRANCES // BEST PRICES",
-  "AUTHENTIC DESIGNER PERFUMES",
-  "NEW ARRIVALS EVERY WEEK",
-  "EXCLUSIVE FRAGRANCE COLLECTIONS",
-  "CAPTIVATE WITH EVERY SPRAY",
-  "ENDLESS POSSIBILITIES AWAITS",
-];
+export const dynamic = "force-dynamic";
 
 export default function HomePage() {
   const mode = parseMode(cookies().get(MODE_COOKIE)?.value);
   const featured = featuredProducts(mode, 8);
   const stats = catalogStats(mode);
+
+  // Semua teks hero & kategori diturunkan dari master data ERP — tidak ada
+  // nama produk / kategori yang dipaku di kode.
+  const meta = getCatalogMeta();
+  const collections = getCollections();
+  const heroSku = flagshipSku();
+  const hero = heroSku ? getProductDetail(heroSku, mode) : null;
+
+  const marquee = [
+    "MASTER DATA ERP // LIVE KATALOG",
+    ...collections.slice(0, 3).map((c) => `${c.title.toUpperCase()} · ${formatNumber(c.total)} SKU`),
+    `SNAPSHOT ${new Date(meta.fetchedAt).toLocaleDateString("id-ID")}`,
+    "BOM-DRIVEN STOCK ALLOCATION",
+  ];
 
   return (
     <div>
@@ -46,25 +47,25 @@ export default function HomePage() {
           />
           <div className="relative z-10 max-w-xl px-6 py-12 sm:px-12">
             <p className="text-[10px] uppercase tracking-widest2 text-white/70">
-              New launch promotion
+              Sumber data: ERP · {meta.counts.products} produk master
             </p>
-            <h1 className="mt-3 font-display text-4xl leading-[1.05] text-white sm:text-6xl">
-              Sanctum &amp; Noctis
-              <br />
-              20ml Collection
+            <h1 className="mt-3 font-display text-4xl leading-[1.05] text-white sm:text-5xl">
+              {hero ? hero.name : "Katalog belum tersedia"}
             </h1>
             <p className="mt-4 max-w-md text-xs leading-relaxed text-white/75">
-              Bundling dua varian 20ml dengan harga khusus. Stok terbatas — dan di
-              sandbox ini stoknya benar-benar dihitung dari komponen, bukan angka
-              manual.
+              Katalog, harga, dan stok di toko ini dibaca dari master data ERP
+              (MOAI SCM-ERP). SKU rakitan dihitung dari komposisi BOM-nya, bukan dari
+              angka kuota manual.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                href="/product/SANCTUM-NOCTIS-20ML-A1"
-                className="inline-flex items-center bg-white px-6 py-3 text-[11px] uppercase tracking-widest2 text-ink hover:bg-bone"
-              >
-                Beli bundling
-              </Link>
+              {hero ? (
+                <Link
+                  href={`/product/${encodeURIComponent(hero.sku)}`}
+                  className="inline-flex items-center bg-white px-6 py-3 text-[11px] uppercase tracking-widest2 text-ink hover:bg-bone"
+                >
+                  Lihat SKU unggulan
+                </Link>
+              ) : null}
               <Link
                 href="/shop"
                 className="inline-flex items-center border border-white/50 px-6 py-3 text-[11px] uppercase tracking-widest2 text-white hover:bg-white/10"
@@ -74,7 +75,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* siluet botol dekoratif */}
+          {/* siluet perangkat dekoratif */}
           <div className="pointer-events-none absolute bottom-0 right-6 hidden items-end gap-3 sm:flex">
             {[
               { h: 210, hue: 205 },
@@ -98,17 +99,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CATEGORY TILES */}
+      {/* COLLECTION TILES — diturunkan dari item_type ERP */}
       <section className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {CATEGORIES.map((c) => (
+        {collections.slice(0, 3).map((c) => (
           <Link
-            key={c.key}
-            href={`/shop?gender=${c.key}`}
+            key={c.slug}
+            href={`/collections/${c.slug}`}
             className="group flex h-28 flex-col items-center justify-center bg-mist transition-colors hover:bg-bone"
           >
-            <span className="font-display text-2xl tracking-wide">{c.label}</span>
+            <span className="font-display text-2xl tracking-wide">{c.title}</span>
             <span className="mt-1 text-[9px] uppercase tracking-widest2 text-smoke">
-              {c.note}
+              {formatNumber(c.total)} SKU
             </span>
           </Link>
         ))}
@@ -119,7 +120,7 @@ export default function HomePage() {
         <div className="marquee-track">
           {[0, 1].map((dup) => (
             <div key={dup} className="flex shrink-0">
-              {MARQUEE.map((t, i) => (
+              {marquee.map((t, i) => (
                 <span
                   key={`${dup}-${i}`}
                   className="whitespace-nowrap px-5 text-[12px] uppercase tracking-widest2 text-ink/70"
@@ -139,7 +140,7 @@ export default function HomePage() {
             <h2 className="font-display text-3xl">Our Products</h2>
             <p className="mt-1 text-[10px] uppercase tracking-widest2 text-smoke">
               {formatNumber(stats.totalSkus)} SKU · {formatNumber(stats.singles)} single ·{" "}
-              {formatNumber(stats.bundles)} bundling
+              {formatNumber(stats.bundles)} bundling · checksum {meta.checksum.slice(0, 8)}
             </p>
           </div>
           <Link href="/shop" className="nav-link underline underline-offset-8">
@@ -159,10 +160,10 @@ export default function HomePage() {
         </p>
         <div className="mt-3 grid gap-4 text-xs leading-relaxed text-ink/80 md:grid-cols-3">
           <p>
-            Mode <strong>baseline</strong> menampilkan kuota stok manual dari WMS 4.1
-            apa adanya. Angka tidak pernah turun walau komponennya terjual — di sinilah{" "}
-            <strong>{formatNumber(stats.phantomUnits)} unit phantom stock</strong> muncul
-            di {formatNumber(stats.phantomSkus)} SKU bundling.
+            Mode <strong>baseline</strong> menampilkan kuota stok manual yang dilaporkan
+            ERP/WMS apa adanya. Angka tidak pernah turun walau komponennya terjual — di
+            sinilah <strong>{formatNumber(stats.phantomUnits)} unit phantom stock</strong>{" "}
+            muncul di {formatNumber(stats.phantomSkus)} SKU bundling.
           </p>
           <p>
             Mode <strong>to-be</strong> menghitung stok bundling dari komponen pembatas

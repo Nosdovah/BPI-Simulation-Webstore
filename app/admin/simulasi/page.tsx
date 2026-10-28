@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { catalogStats, componentStocks, getProductDetail } from "@/lib/core";
+import { flagshipSku, getCatalogMeta, getOrphanBomSkus } from "@/lib/catalog";
 import { MODE_COOKIE, parseMode, readTelemetry, soldSnapshot } from "@/lib/state";
 import { formatNumber, formatDateTime } from "@/lib/format";
 import { SimControls } from "@/components/SimControls";
@@ -23,9 +24,20 @@ export default function SimulationPanel() {
   const stocks = componentStocks();
   const toggleMode = mode === "tobe" ? "baseline" : "tobe";
 
-  const flagship = getProductDetail("SANCTUM-NOCTIS-20ML-A1", mode);
-  const flagshipBaseline = getProductDetail("SANCTUM-NOCTIS-20ML-A1", "baseline");
-  const flagshipTobe = getProductDetail("SANCTUM-NOCTIS-20ML-A1", "tobe");
+  // SKU unggulan diambil dari data ERP (bundle BOM pertama), bukan dipaku.
+  const meta = getCatalogMeta();
+  const orphanBoms = getOrphanBomSkus();
+  const flagshipId = flagshipSku();
+  const flagship = flagshipId ? getProductDetail(flagshipId, mode) : null;
+  const flagshipBaseline = flagshipId ? getProductDetail(flagshipId, "baseline") : null;
+  const flagshipTobe = flagshipId ? getProductDetail(flagshipId, "tobe") : null;
+
+  const flagshipComponents = flagshipTobe?.bundleComponents ?? [];
+  const flagshipCapacity = flagshipComponents.length
+    ? Math.min(
+        ...flagshipComponents.map((c) => Math.floor(c.componentStock / c.multiplierQty)),
+      )
+    : 0;
 
   const telemetry = readTelemetry().slice(0, 12);
   const sold = soldSnapshot();
@@ -69,7 +81,7 @@ export default function SimulationPanel() {
       <section className="mt-6 border border-ink/15">
         <div className="border-b border-ink/10 bg-bone px-5 py-3">
           <p className="text-[10px] uppercase tracking-widest2 text-ink">
-            Bukti SKU flagship — SANCTUM-NOCTIS-20ML-A1
+            Bukti SKU unggulan — {flagship?.sku ?? "belum ada SKU"}
           </p>
         </div>
         <table className="w-full text-xs">
@@ -91,13 +103,15 @@ export default function SimulationPanel() {
                 {formatNumber(flagshipTobe?.stockDisplay ?? 0)}
               </td>
               <td className="px-5 py-3 text-smoke">
-                {flagship?.isBundle ? "Bundle 2 botol 20ml" : ""}
+                {flagship?.isBundle ? "SKU rakitan (BOM ERP)" : "SKU satuan master ERP"}
               </td>
             </tr>
             <tr className="border-t border-ink/5">
               <td className="px-5 py-3">Komposisi terkirim</td>
               <td className="px-3 py-3 text-right text-alert">tidak ada</td>
-              <td className="px-3 py-3 text-right text-emerald-700">2 komponen</td>
+              <td className="px-3 py-3 text-right text-emerald-700">
+                {flagshipComponents.length} komponen
+              </td>
               <td className="px-5 py-3 text-smoke">
                 is_bundle + components[] hanya ada di to-be
               </td>
@@ -106,18 +120,59 @@ export default function SimulationPanel() {
               <td className="px-5 py-3">Kapasitas komponen</td>
               <td className="px-3 py-3 text-right font-mono">—</td>
               <td className="px-3 py-3 text-right font-mono">
-                {formatNumber(
-                  Math.min(
-                    ...(flagshipTobe?.bundleComponents ?? []).map((c) =>
-                      Math.floor(c.componentStock / c.multiplierQty),
-                    ),
-                  ) || 0,
-                )}
+                {formatNumber(flagshipCapacity)}
               </td>
-              <td className="px-5 py-3 text-smoke">diambil dari stok material M2291/M2292</td>
+              <td className="px-5 py-3 text-smoke">
+                MIN(FLOOR(stok komponen / qty)) dari BOM ERP
+              </td>
             </tr>
           </tbody>
         </table>
+      </section>
+
+      <section className="mt-6 border border-ink/15">
+        <div className="border-b border-ink/10 bg-bone px-5 py-3">
+          <p className="text-[10px] uppercase tracking-widest2 text-ink">
+            Jejak integrasi master data ERP
+          </p>
+        </div>
+        <div className="grid gap-4 px-5 py-4 text-xs sm:grid-cols-2">
+          <div>
+            <p className="text-smoke">Sumber</p>
+            <p className="mt-1 break-all font-mono text-[11px]">{meta.baseUrl}</p>
+          </div>
+          <div>
+            <p className="text-smoke">Snapshot diambil</p>
+            <p className="mt-1 font-mono text-[11px]">
+              {formatDateTime(new Date(meta.fetchedAt).getTime())}
+            </p>
+          </div>
+          <div>
+            <p className="text-smoke">Checksum data (sha256)</p>
+            <p className="mt-1 break-all font-mono text-[11px]">{meta.checksum}</p>
+          </div>
+          <div>
+            <p className="text-smoke">Jumlah record</p>
+            <p className="mt-1 font-mono text-[11px]">
+              {formatNumber(meta.counts.products)} produk ·{" "}
+              {formatNumber(meta.counts.balances)} saldo · {formatNumber(meta.counts.boms)} BOM
+            </p>
+          </div>
+          {orphanBoms.length > 0 ? (
+            <div className="sm:col-span-2">
+              <p className="text-alert">Integritas referensial: BOM tanpa master produk</p>
+              <ul className="mt-1 space-y-1 font-mono text-[11px] text-alert">
+                {orphanBoms.map((sku) => (
+                  <li key={sku}>{sku} — target/komponen tidak ada di master products</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="sm:col-span-2">
+              <p className="text-emerald-700">Integritas referensial: bersih</p>
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="mt-6">

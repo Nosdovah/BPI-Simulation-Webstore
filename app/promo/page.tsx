@@ -16,13 +16,13 @@ const PROMOS = [
   {
     title: "Launching 20ml colors",
     copy: "Seri warna baru 20ml — stok terbatas, dihitung dari komponen.",
-    cta: "/collections/signature",
+    cta: "/collections",
     label: "Buka koleksi",
   },
   {
     title: "Free 20ml Numayr",
     copy: "Bonus 20ml untuk pembelian extrait 50ml selama periode promo.",
-    cta: "/collections/kadam-sidik",
+    cta: "/collections",
     label: "Lihat kolaborasi",
   },
 ];
