@@ -1,28 +1,92 @@
 {
-  "fetched_at": "2026-10-27T16:23:55.898Z",
-  "base_url": "http://127.0.0.1:8100",
-  "checksum": "f9f5c05c651d0e52a54221d30d186ad25d92767ead486d0dfb2b7e2e60863d7b",
+  "contract": "perpack-replica",
+  "fetched_at": "2026-10-29T14:54:52.127Z",
+  "base_url": "https://web-production-e60b55.up.railway.app",
+  "checksum": "094a46ae234e01e34373a1d4075fdde95fed1f4c0fa43344a3ab6a947f423f37",
   "counts": {
-    "products": 3696,
-    "balances": 3664,
-    "boms": 1,
-    "warehouses": 3,
-    "operational": 0
+    "products": 3727,
+    "variants": 3727,
+    "groups": 302,
+    "warehouses": 2,
+    "channels": 10,
+    "bundles": 3039
   },
   "integrity": {
-    "duplicate_skus": [],
-    "orphan_boms": [],
-    "missing_price": [],
+    "catalog_count_expected": 3727,
+    "catalog_count_actual": 3727,
+    "catalog_pagination_complete": true,
+    "duplicate_skus": [
+      "M766-AquacDigi-20ml-A2",
+      "M767-AquacDigi-30ml-A2",
+      "M768-AquacDigi-50ml-A2",
+      "M1050-Veroz-20ml-A3",
+      "M1051-Veroz-30ml-A3",
+      "M1052-Veroz-50ml-A3",
+      "M990-PinkyChiffony-20ml-A3",
+      "M992-PinkyChiffony-50ml-A3",
+      "M991-PinkyChiffony-30ml-A3",
+      "M874-SavageMen-20ml-A2",
+      "M875-SavageMen-30ml-A2",
+      "M876-SavageMen-50ml-A2",
+      "M886-EnglandFreshPear-20ml-B2",
+      "M942-NzoBalinese-20ml-B3",
+      "M944-NzoBalinese-50ml-B3"
+    ],
+    "bundles_without_components": [
+      "M990-PinkyChiffony-20ml-A3",
+      "M992-PinkyChiffony-50ml-A3"
+    ],
+    "missing_components": [
+      {
+        "sku": "GamuciGardenia+KingRaffi-30ml-A1",
+        "missing": [
+          "M927-GamuciGardenia-30ml-A1"
+        ]
+      },
+      {
+        "sku": "GamuciGardenia2pcs-30ml-A1",
+        "missing": [
+          "M927-GamuciGardenia-30ml-A1"
+        ]
+      },
+      {
+        "sku": "M927-GamuciGardenia-30ml-C1",
+        "missing": [
+          "M927-GamuciGardenia-30ml-A1"
+        ]
+      }
+    ],
+    "missing_price": [
+      "ZF30M",
+      "3pcsElixirOne+BlackOpm20ml-A1",
+      "M1878",
+      "M2609",
+      "OCT-TEST-SMOKE-001",
+      "OCT-TEST-SMOKE-002",
+      "OCT-TEST-SMOKE-003",
+      "OCT-TEST-SMOKE-004",
+      "OCT-TEST-SMOKE-005",
+      "OCT-TEST-SMOKE-006",
+      "OCT-TEST-SMOKE-007",
+      "OCT-TEST-SMOKE-008",
+      "CharmBucket-Bundling2"
+    ],
     "negative_stock": [],
-    "warehouse_breakdown_available": false
+    "bundle_stock_summary": {
+      "total_bundles": 3039,
+      "oversell": 1,
+      "understate": 916,
+      "matched": 2122
+    },
+    "warehouse_breakdown_available": true
   },
   "previous": {
-    "fetched_at": "2026-10-27T16:21:07.724Z",
-    "checksum": "0c0872ea9f0c8e405e253cbe953982780100cdb98cc26da8bc613a351bf04a75",
+    "fetched_at": "2026-10-27T16:23:55.898Z",
+    "checksum": "f9f5c05c651d0e52a54221d30d186ad25d92767ead486d0dfb2b7e2e60863d7b",
     "counts": {
       "products": 3696,
       "balances": 3664,
-      "boms": 0,
+      "boms": 1,
       "warehouses": 3,
       "operational": 0
     }
