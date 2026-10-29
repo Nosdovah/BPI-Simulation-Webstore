@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "Kontrak API ERP <-> Webstore",
+  "version": "1.0",
+  "status": "ACUAN_RESMI",
+  "declared_at": "2026-10-29",
+  "source_document": {
+    "path": "docs/PANDUAN_KONEKSI_ERP_WEBSTORE.md",
+    "doc_version": "2.0",
+    "sha256": "15299d4c9eaa09202aa8001be4c73c37a8584dee90f4109209aeec75d60da62f",
+    "section": "5"
+  },
+  "pin": {
+    "repo": "Nosdovah/BPI-Simulation-ERP",
+    "branch": "feat/api-v1-v2-contract",
+    "commit": "e611d34171a2316acb4969d6dcc724256d755636",
+    "commit_date": "2026-10-28T10:05:31+08:00",
+    "note": "Kontrak TIDAK berlaku untuk main@3599e82 — main tidak punya /api/v1/*"
+  },
+  "base_url_default": "http://127.0.0.1:8100",
+  "envelope": {
+    "v1": { "shape": "code/msg/data", "example": { "code": 200, "msg": { "id": "Sukses", "en": "Success" }, "data": {} } },
+    "v2": { "shape": "flat", "example": { "count": 0, "items": [] } },
+    "error": { "shape": "detail", "example": { "detail": "..." }, "http_status_range": "4xx/5xx" },
+    "exceptions": [
+      {
+        "path": "/api/v1/storefront/checkout",
+        "method": "POST",
+        "shape": "flat_no_envelope",
+        "fields": ["message", "order_ref", "status", "updated_by", "sla_seconds"]
+      }
+    ]
+  },
+  "families": {
+    "/api/v1/*": { "role": "execution", "mutates_state": true, "impl": "apps/wms-stub/main.py" },
+    "/api/v2/*": { "role": "read_model", "mutates_state": false, "impl": "apps/wms-stub/compat.py" },
+    "/api/webhooks/wms": { "role": "receiver", "mutates_state": true, "impl": "app/api/webhooks/wms/route.ts" },
+    "/v1/open/*": { "role": "admin_legacy", "mutates_state": true, "impl": "apps/wms-stub/main.py" }
+  },
+  "endpoints": [
+    {
+      "id": "healthz",
+      "method": "GET",
+      "path": "/healthz",
+      "family": "meta",
+      "expect": { "ok": true, "mode": ["baseline", "tobe"] }
+    },
+    {
+      "id": "v2_products",
+      "method": "GET",
+      "path": "/api/v2/master/products",
+      "family": "v2",
+      "query": { "limit": "1..50000" },
+      "expect_count_tobe": 3696,
+      "fields": ["id", "sku", "name", "brand", "category", "item_type", "specs", "stock", "unit_price", "is_assembly"]
+    },
+    {
+      "id": "v2_balances",
+      "method": "GET",
+      "path": "/api/v2/inventory/balances",
+      "family": "v2",
+      "query": { "limit": "1..50000" },
+      "expect_count_tobe": 3664,
+      "fields": ["sku", "stock_on_hand", "allocated", "available", "on_order", "bin_code"]
+    },
+    {
+      "id": "v2_by_warehouse",
+      "method": "GET",
+      "path": "/api/v2/inventory/by-warehouse",
+      "family": "v2",
+      "expect_count_tobe": 7325,
+      "fields": ["sku", "warehouse_id", "warehouse_name", "available", "reserved", "on_order"]
+    },
+    {
+      "id": "v2_boms",
+      "method": "GET",
+      "path": "/api/v2/assembly/boms",
+      "family": "v2",
+      "expect_count": { "tobe": 1, "baseline": 0 },
+      "fields": ["target_sku", "version", "source", "labor_cost", "overhead_cost", "components"]
+    },
+    {
+      "id": "v2_bundle_stock",
+      "method": "GET",
+      "path": "/api/v2/assembly/bundle-stock",
+      "family": "v2",
+      "expect_count_tobe": 0,
+      "fields": ["bundle_sku", "quota_static", "components", "stock_from_components", "phantom"]
+    },
+    {
+      "id": "v2_warehouses",
+      "method": "GET",
+      "path": "/api/v2/master/warehouses",
+      "family": "v2",
+      "expect_count_tobe": 3,
+      "fields": ["id", "code", "name", "type"]
+    },
+    {
+      "id": "v2_operational",
+      "method": "GET",
+      "path": "/api/v2/master/operational",
+      "family": "v2",
+      "expect_count_tobe": 0,
+      "fields": ["min_stock", "max_stock", "reorder_point"]
+    },
+    {
+      "id": "v1_inventory",
+      "method": "GET",
+      "path": "/api/v1/inventory/{sku}",
+      "family": "v1",
+      "errors": { "404": "SKU tidak ditemukan" },
+      "bundle_rule": "MIN(floor(component_stock / multiplier))",
+      "expect_bundle_tobe": { "sku": "Sanctum+Noctis-20ml-A1", "available_stock": 10932, "components": 2 }
+    },
+    {
+      "id": "v1_checkout",
+      "method": "POST",
+      "path": "/api/v1/storefront/checkout",
+      "family": "v1",
+      "request": { "order_ref": "string", "channel": "WEBSTORE", "items": [{ "sku": "string", "qty": "int" }] },
+      "expect_response": { "status": "process", "updated_by": "SYSTEM", "sla_seconds": 5.0 },
+      "errors": {
+        "404": "SKU tidak ada",
+        "409": "bundle tanpa relasi BOM (baseline)"
+      },
+      "behavior": ["atomic_stock_deduction", "zero_click_paid_to_process", "webhook_background_task"]
+    },
+    {
+      "id": "v1_transition",
+      "method": "POST",
+      "path": "/api/v1/wms/orders/{order_ref}/transition",
+      "family": "v1",
+      "query": { "target_status": "required", "tracking_number": "optional" },
+      "errors": {
+        "422": "enum status tidak dikenal",
+        "404": "order tidak ditemukan",
+        "409_terminal": "order terminal — immutable",
+        "409_regression": "no-regression: status tidak boleh mundur"
+      }
+    },
+    {
+      "id": "v1_audit",
+      "method": "GET",
+      "path": "/api/v1/audit/webhook-logs",
+      "family": "v1",
+      "query": { "limit": "int" },
+      "fields": ["id", "event_id", "event", "lane", "attempt", "http_status", "signature", "sent_at"],
+      "http_status_semantics": { "202": "diterima", "0": "gagal koneksi", "4xx": "ditolak receiver" }
+    }
+  ],
+  "order_state_machine": {
+    "forward": ["paid", "process", "pick", "packing", "packed", "ready_to_pickup", "sent", "completed"],
+    "terminal": ["cancelled", "returned", "completed"],
+    "rules": ["no_regression", "terminal_immutable"]
+  },
+  "status_enum_map": {
+    "paid": "PAID",
+    "process": "PROCESSING",
+    "packing": "PROCESSING",
+    "pick": "PICKING",
+    "packed": "PACKED",
+    "ready_to_pickup": "HANDOVER_TO_COURIER",
+    "sent": "IN_TRANSIT",
+    "completed": "COMPLETED",
+    "cancelled": "CANCELLED",
+    "returned": "RETURNED"
+  },
+  "receiver_contract": {
+    "path": "/api/webhooks/wms",
+    "auth": ["Authorization: Bearer <OSR_WEBHOOK_TOKEN>", "X-OSR-Webhook-Token", "?token="],
+    "signature": "X-Perpack-Signature: sha256=<hmac_sha256(raw_body, secret)>",
+    "signature_alias": "X-OSR-Signature",
+    "dedupe": ["event_id", "Idempotency-Key", "body_hash"],
+    "responses": { "202": "accepted", "200": "duplicate", "400": "EMPTY_BODY", "401": "UNAUTHORIZED", "422": "missing_event", "503": "server_token_unset" },
+    "unknown_order_note": "apply_note: order <ref> tidak dikenal di core (diabaikan)"
+  },
+  "auth_matrix": {
+    "/api/v2/*": { "erp_env": "OSR_ERP_SERVICE_TOKEN", "webstore_env": "OSR_ERP_TOKEN", "optional_when_unset": true },
+    "/api/v1/*": { "token": "none", "scope": "loopback_only" },
+    "/api/webhooks/wms": { "erp_env": "WEBHOOK_TOKEN", "webstore_env": "OSR_WEBHOOK_TOKEN" }
+  },
+  "field_mapping": {
+    "sku": "products.sku",
+    "name": "products.name",
+    "gender": "products.brand",
+    "collection": "products.item_type",
+    "priceIdr": "products.unit_price|wholesale_price",
+    "baselineQuota": "balances.stock_on_hand",
+    "description": "products.specs",
+    "isBundle": "boms.target_sku",
+    "components[]": "boms.components[]"
+  },
+  "known_drift": [
+    {
+      "id": "main_lacks_v1",
+      "severity": "high",
+      "detail": "main@3599e82 punya /api/v2/* tetapi 0 endpoint /api/v1/* — Jalur B gagal, Jalur A tampak normal"
+    },
+    {
+      "id": "webstore_baseline_removed",
+      "severity": "low",
+      "detail": "webstore commit 8cf22fb menghapus mode baseline; dualitas baseline/tobe milik ERP saja"
+    },
+    {
+      "id": "http_status_zero",
+      "severity": "medium",
+      "detail": "webhook_delivery_log menulis http_status=0 saat koneksi gagal; filter 202 untuk hitungan sukses"
+    }
+  ],
+  "verification": {
+    "script": "scripts/verify-api-contract.mjs",
+    "gates": 18,
+    "last_run": "2026-10-29T08:43:00Z",
+    "last_result": "18/18 LULUS",
+    "mode": "tobe",
+    "seed_gate": {
+      "variants": 3696,
+      "stocks": 7325,
+      "sku_bom": 2,
+      "phantom_units": 995,
+      "stuck_orders": 82,
+      "stuck_over_2_days": 21,
+      "manual_completed": 57,
+      "webhook_events": 103,
+      "valid_events": 20,
+      "dpmo": 805825
+    }
+  }
+}

@@ -9,6 +9,7 @@
     "start": "next start -p 3000",
     "lint": "next lint",
     "verify": "node scripts/verify.mjs",
+    "verify:contract": "node scripts/verify-api-contract.mjs",
     "erp:sync": "node scripts/erp-sync.mjs",
     "erp:check": "node scripts/erp-sync.mjs && echo 'snapshot siap'"
   },
