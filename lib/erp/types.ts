@@ -63,6 +63,13 @@ export type ErpOperational = {
   is_fast_moving?: boolean | null;
 };
 
+export type ErpBundleStock = {
+  bundle_sku: string;
+  quota_static: number;
+  stock_from_components: number | null;
+  bom_available?: boolean;
+};
+
 export type ErpIntegrity = {
   duplicate_skus: string[];
   orphan_boms: Array<{
@@ -73,6 +80,16 @@ export type ErpIntegrity = {
   missing_price: string[];
   negative_stock: string[];
   warehouse_breakdown_available: boolean;
+  /* ---- v2: phantom gate (pull.mjs) ---------------------------------- */
+  bundle_stock_available: boolean;
+  phantom_bundles: Array<{
+    bundle_sku: string;
+    quota_static: number;
+    stock_from_components: number;
+    phantom_units: number;
+  }>;
+  phantom_exposure_units: number;
+  phantom_uncomputable: string[];
 };
 
 export type ErpSnapshotData = {
@@ -81,6 +98,7 @@ export type ErpSnapshotData = {
   boms: ErpBom[];
   warehouses: ErpWarehouse[];
   operational: ErpOperational[];
+  bundle_stock: ErpBundleStock[];
 };
 
 export type ErpSnapshot = {
@@ -93,8 +111,60 @@ export type ErpSnapshot = {
     boms: number;
     warehouses: number;
     operational: number;
+    bundle_stock: number;
   };
   integrity: ErpIntegrity;
+  bundle_stock_error: string | null;
   checksum: string;
   data: ErpSnapshotData;
+};
+
+/* ------------------------------------------------------------------ */
+/* Jalur B — kontrak order (lib/erp/order.mjs)                         */
+/* ------------------------------------------------------------------ */
+
+export type ErpOrderContractFamily = "engine-v1" | "blueprint-v02" | "none";
+
+export type ErpOrderConfig = {
+  baseUrl: string;
+  token: string;
+  timeoutMs: number;
+  retries: number;
+  mode: "push" | "off";
+  strict: boolean;
+  sync: boolean;
+  stockOverlay: "local" | "webhook";
+  statusTtlMs: number;
+};
+
+export type PushOrderResult = {
+  ok: boolean;
+  contract?: ErpOrderContractFamily;
+  httpStatus?: number | null;
+  erpId?: number | null;
+  erpOrderRef?: string;
+  /** Enum baku storefront (huruf besar). */
+  status?: string;
+  rawStatus?: string | null;
+  note?: string | null;
+  raw?: unknown;
+  error?: string;
+};
+
+export type ErpOrderLookup = {
+  ok: boolean;
+  found: boolean;
+  ref: string;
+  erpId?: number | null;
+  rawStatus?: string | null;
+  /** Enum baku storefront (huruf besar). */
+  status?: string | null;
+  trackingNo?: string | null;
+  courier?: string | null;
+  actorLast?: string | null;
+  totalIdr?: number | null;
+  duplicates?: number;
+  total?: number;
+  raw?: unknown;
+  error?: string;
 };
