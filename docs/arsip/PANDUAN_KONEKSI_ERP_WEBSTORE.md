@@ -1,3 +1,16 @@
+> ⚠️ **DOKUMEN INI SUDAH TIDAK BERLAKU (ARSIP).**
+>
+> Isinya mendokumentasikan **engine ERP blueprint-v2** (`/api/v2/*`, `/api/v1/*`, `/v1/open/*`)
+> pada branch `feat/api-v1-v2-contract` — skema itu **sudah ditinggalkan** dan
+> **tidak boleh di-deploy**. Kontrak resmi sekarang adalah **replika API Perpack**.
+>
+> Dokumen aktif: [`../KONTRAK_API_ERP.md`](../KONTRAK_API_ERP.md)
+>
+> Disimpan hanya sebagai jejak keputusan (kenapa v2 gugur). Jangan dipakai
+> sebagai acuan implementasi.
+
+---
+
 # Panduan Koneksi ERP ↔ Webstore
 
 **Proyek:** OSR / Octarine Sandbox — BPI DMAIC

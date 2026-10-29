@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { addSold, pushTelemetry } from "@/lib/state";
 import { findProductsBySkus, findProduct } from "@/lib/catalog";
 import { checkStock } from "@/lib/core";
-import { buildOrder, nextOrderRef, rememberOrder, signOrder } from "@/lib/orders";
+import {
+  applyErpPush,
+  buildOrder,
+  nextOrderRef,
+  rememberOrder,
+  signOrder,
+} from "@/lib/orders";
+import { pushOrder, pushStockUpdated, resolveErpOrderConfig } from "@/lib/erp/order.mjs";
 import type { OrderItem } from "@/lib/types";
 
 type Payload = {
@@ -100,17 +107,87 @@ export async function POST(request: Request) {
     items,
   });
 
-  // Penjualan mengurangi stok komponen sehingga angka paket ikut turun.
+  /* ------------------------------------------------------------- Jalur B ---
+   * Order dikirim ke ERP (Modul 4.2 Order & Status) SEBELUM diumumkan sukses.
+   * Urutannya disengaja: kalau ERP menolak, pelanggan tidak pernah menerima
+   * nomor pesanan yang tidak ada di sistem gudang.
+   */
+  const erp = resolveErpOrderConfig();
+  let erpSynced = false;
+
+  if (erp.mode === "push") {
+    const result = await pushOrder(erp, order);
+    applyErpPush(order, result);
+    erpSynced = result.ok;
+
+    pushTelemetry({
+      event: result.ok ? "erp_order_pushed" : "erp_order_failed",
+      ref: order.ref,
+      contract: result.contract ?? null,
+      erp_id: result.erpId ?? null,
+      status: result.rawStatus ?? null,
+      error: result.error ?? null,
+    });
+
+    if (!result.ok && erp.strict) {
+      return NextResponse.json(
+        {
+          error: "ERP_REJECTED",
+          message:
+            "Pesanan tidak bisa dicatat di ERP, jadi checkout dibatalkan. " +
+            "Tidak ada nomor pesanan yang dibuat.",
+          contract: result.contract ?? null,
+          erp: {
+            base_url: erp.baseUrl,
+            error: result.error ?? null,
+            http_status: result.httpStatus ?? null,
+          },
+        },
+        { status: 502 },
+      );
+    }
+  }
+
+  /* Penjualan mengurangi stok. Dua jalur, dipilih lewat OSR_ERP_STOCK_OVERLAY:
+   *
+   *   webhook (default) → kirim `stock.updated` ke ERP
+   *                       (`POST /api/webhooks/wms`), ERP yang mengurangi stok
+   *                       sehingga angka di ERP tetap sumber kebenaran.
+   *   local             → ERP tidak disentuh; storefront menyimpan overlay
+   *                       "terjual" in-memory di atas snapshot (dipakai kalau
+   *                       webhook ERP dimatikan).
+   *
+   * Overlay lokal tetap dicatat untuk tampilan supaya angka langsung turun
+   * tanpa menunggu `erp:sync` berikutnya.
+   */
+  const stockEvents: Array<{ sku: string; delta: number; ok: boolean; error: string | null }> = [];
+
   for (const item of items) {
     const product = findProduct(item.sku);
     if (!product) continue;
-    if (product.isBundle) {
-      for (const comp of product.components) {
-        addSold(comp.materialCode, comp.multiplierQty * item.qty);
+
+    const lines = product.isBundle
+      ? product.components.map((c) => ({
+          sku: c.materialCode,
+          delta: c.multiplierQty * item.qty,
+        }))
+      : [{ sku: product.materialCode ?? product.sku, delta: item.qty }];
+
+    for (const line of lines) {
+      addSold(line.sku, line.delta);
+      if (erp.mode === "push" && erpSynced && erp.stockOverlay === "webhook") {
+        const res = await pushStockUpdated(erp, line.sku, line.delta);
+        stockEvents.push({
+          sku: line.sku,
+          delta: line.delta,
+          ok: res.ok && res.applied !== false,
+          error: res.error ?? null,
+        });
       }
-    } else if (product.materialCode) {
-      addSold(product.materialCode, item.qty);
     }
+
+    /* Bundle juga punya overlay sendiri (kunci = SKU bundle) untuk mode AS-IS. */
+    if (product.isBundle) addSold(product.sku, item.qty);
   }
 
   rememberOrder(order);
@@ -120,6 +197,7 @@ export async function POST(request: Request) {
     total: order.totalIdr,
     items: items.length,
     idempotency_key: body.idempotency_key ?? null,
+    erp_synced: erpSynced,
   });
 
   return NextResponse.json({
@@ -127,5 +205,18 @@ export async function POST(request: Request) {
     ref: order.ref,
     token: signOrder(order),
     order,
+    integration: {
+      lane: "4.2",
+      mode: erp.mode,
+      synced: erpSynced,
+      contract: order.erp?.contract ?? null,
+      erp_id: order.erp?.erpId ?? null,
+      erp_status: order.erp?.rawStatus ?? null,
+      error: order.erp?.error ?? null,
+      // Order tetap diterima walau ERP down selama mode tidak strict.
+      degraded: erp.mode === "push" && !erpSynced,
+      stock_overlay: erp.stockOverlay,
+      stock_events: stockEvents,
+    },
   });
 }

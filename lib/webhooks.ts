@@ -2,7 +2,8 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { addSold } from "./state";
-import { recallOrder, rememberOrder } from "./orders";
+import { applyErpStatus, recallOrder, rememberOrder } from "./orders";
+import { mapErpStatus } from "./erp/order.mjs";
 import type { OrderStatus } from "./types";
 
 /**
@@ -231,17 +232,19 @@ function pruneSeen(s: WebhookState) {
 
 /* ------------------------------------------------------------- apply --- */
 
+/* Enum status = enum ERP replika Perpack (10 nilai), huruf besar.
+ * Storefront tidak punya status sendiri di luar daftar ini. */
 const ORDER_STATUSES: OrderStatus[] = [
   "PAID",
-  "PROCESSING",
+  "PROCESS",
   "PICKING",
+  "PACKING",
   "PACKED",
-  "HANDOVER_TO_COURIER",
-  "IN_TRANSIT",
-  "ARRIVED_AT_HUB",
-  "OUT_FOR_DELIVERY",
-  "DELIVERED",
+  "READY_TO_PICKUP",
+  "SENT",
   "COMPLETED",
+  "CANCELLED",
+  "RETURNED",
 ];
 
 // Kode material = SKU master data ERP (mis. SKU-SP-FAN-017, PB-ARES-78X).
@@ -252,13 +255,25 @@ function applyEvent(body: WebhookEvent): { applied: boolean; note: string | null
   const data = body.data ?? {};
 
   if (body.event === "stock.updated" || body.event === "inventory.updated") {
+    // Overlay stok: kalau checkout SUDAH mengirim `stock.updated` ke ERP
+    // (`OSR_ERP_STOCK_OVERLAY=webhook`, default), event yang datang balik dari
+    // ERP tidak boleh diterapkan lagi — kalau diterapkan, stok turun dua kali.
+    // Event tetap dicatat untuk audit.
+    if ((process.env.OSR_ERP_STOCK_OVERLAY ?? "webhook").toLowerCase() === "webhook") {
+      return {
+        applied: false,
+        note:
+          "stock.updated dicatat saja (OSR_ERP_STOCK_OVERLAY=webhook; pengurangan stok sudah dikirim storefront ke ERP saat checkout).",
+      };
+    }
+
     const materialCode = String(
       data.materialCode ?? data.material_code ?? data.sku ?? "",
     ).trim();
     if (!MATERIAL_RE.test(materialCode)) {
       return {
         applied: false,
-        note: `materialCode "${materialCode}" tidak valid (harus M###).`,
+        note: `materialCode "${materialCode}" tidak valid.`,
       };
     }
     const delta = Number(
@@ -276,28 +291,44 @@ function applyEvent(body: WebhookEvent): { applied: boolean; note: string | null
 
   if (body.event === "order.status_changed" || body.event === "order.updated") {
     const ref = String(data.ref ?? data.order_ref ?? data.orderRef ?? "").trim();
-    if (!ref) return { applied: false, note: "ref order kosong." };
+    if (!ref) {
+      return { applied: false, note: "ref order kosong (payload ERP cacat)." };
+    }
 
     const order = recallOrder(ref);
     if (!order) {
-      return { applied: false, note: `order ${ref} tidak dikenal di core (diabaikan).` };
+      // Wajar saat proses storefront baru restart atau order dibuat di luar
+      // storefront: status tidak hilang, karena /api/orders/[ref] tetap
+      // merekonsiliasi langsung dari ERP.
+      return {
+        applied: false,
+        note: `order ${ref} belum terdaftar di core; status akan direkonsiliasi dari ERP saat halaman dibuka.`,
+      };
     }
 
-    const rawStatus = String(data.status ?? "").trim();
-    if (!ORDER_STATUSES.includes(rawStatus as OrderStatus)) {
+    const rawStatus = String(data.status ?? data.current_status ?? "").trim();
+    const mapped = mapErpStatus(rawStatus) as OrderStatus | null;
+    if (!mapped || !ORDER_STATUSES.includes(mapped)) {
       return { applied: false, note: `status "${rawStatus}" bukan enum baku.` };
     }
 
-    order.status = rawStatus as OrderStatus;
     const tracking = data.tracking_no ?? data.trackingNo;
-    if (typeof tracking === "string" && tracking.trim()) {
-      order.trackingNo = tracking.trim();
-    }
-    order.actorLast = data.actor === "STAFF" ? "STAFF" : "SYSTEM";
-    order.note =
-      typeof data.note === "string" && data.note.trim() ? data.note.trim() : order.note;
+    const result = applyErpStatus(order, {
+      status: mapped,
+      rawStatus,
+      trackingNo: typeof tracking === "string" && tracking.trim() ? tracking.trim() : null,
+      actorLast: data.actor === "STAFF" ? "STAFF" : "SYSTEM",
+      source: "webhook",
+      erpId: typeof data.wms_order_id === "number" ? data.wms_order_id : null,
+    });
     rememberOrder(order);
-    return { applied: true, note: `order ${ref} → ${rawStatus}.` };
+
+    return {
+      applied: !result.ignored,
+      note: result.ignored
+        ? `order ${ref}: status ${mapped} diabaikan (lebih awal dari status sekarang — anti-regresi).`
+        : `order ${ref} → ${mapped}.`,
+    };
   }
 
   if (body.event === "ping" || body.event === "health.check") {

@@ -1,100 +1,287 @@
-/** DTO mentah dari API ERP (MOAI SCM-ERP v2). Tidak ada nilai default di sini. */
+/**
+ * DTO mentah dari API ERP — replika Perpack (Octarine).
+ *
+ * Sumber kanonik: `GET /openapi.json` di server ERP + `docs/API_INTEGRATION.md`.
+ * Nama field di sini WAJIB sama dengan ERP (`sku`, `sell_price`,
+ * `stock_available`, `is_bundle`, `components[].multiplier_qty`, `stocks[].available`).
+ * Kalau ada mismatch, yang diubah adalah storefront — bukan ERP.
+ *
+ * TIDAK ADA nilai default di sini. Semua angka berasal dari respons ERP.
+ */
 
-export type ErpProduct = {
-  id?: string;
-  sku: string;
-  name: string;
-  brand?: string | null;
-  category?: string | null;
-  item_type?: string | null;
-  specs?: string | null;
-  stock?: number | null;
-  bin_code?: string | null;
-  uom?: string | null;
-  cost_price?: number | null;
-  unit_price?: number | null;
-  retail_usd?: number | null;
-  wholesale_price?: number | null;
-  warranty?: string | null;
-  is_assembly?: boolean | null;
-  is_serial?: boolean | null;
+/** Envelope semua endpoint ERP. */
+export type ErpEnvelope<T> = {
+  code: number;
+  msg: { id: string; en: string };
+  data: T;
+  metadata?: ErpMetadata;
 };
 
-export type ErpBalance = {
-  sku: string;
-  stock_on_hand?: number | null;
-  allocated?: number | null;
-  available?: number | null;
-  bin_code?: string | null;
-  valuation?: number | null;
+export type ErpMetadata = {
+  page: number;
+  length: number;
+  count: number;
+  total_page: number;
 };
 
-export type ErpBomComponent = {
+/** Komposisi bundling — `multiplier_qty`, BUKAN `qty`. */
+export type ErpComponent = {
+  product_id: number;
   component_sku: string;
-  component_name?: string | null;
-  qty: number;
-  scrap_pct?: number | null;
+  multiplier_qty: number;
 };
 
-export type ErpBom = {
-  target_sku: string;
-  target_product_id?: string | null;
-  name?: string | null;
-  version?: string | null;
-  labor_cost?: number | null;
-  overhead_cost?: number | null;
-  components: ErpBomComponent[];
+/** Satu baris `GET /api/webhooks/catalog` (flat, sudah termasuk bundling). */
+export type ErpCatalogItem = {
+  id: number;
+  product_group_id: number;
+  name: string;
+  sku: string;
+  sku_code?: string;
+  alias?: string;
+  sell_price: number;
+  purchase_price?: number;
+  is_bundle: boolean;
+  components: ErpComponent[];
+  images?: string[];
+  stock_available: number;
+};
+
+/** Stok per gudang — `id` di sini adalah id gudang, bukan id stok. */
+export type ErpWarehouseStock = {
+  warehouse_id: number;
+  warehouse_name: string;
+  available: number;
+  reserved: number;
+  on_order: number;
+};
+
+/** Satu baris `/v1/products/group/page` → `variants[]`. */
+export type ErpVariant = {
+  sku: string;
+  product_group_id: number;
+  variation_label?: string;
+  variation_value?: string;
+  weight?: number | null;
+  type?: string;
+  is_bundle: boolean;
+  stocks: ErpWarehouseStock[];
+};
+
+/** Grup produk (diringkas saat snapshot ditulis — payload asli ±2,4 MB). */
+export type ErpGroup = {
+  id: number;
+  product_group_id: number;
+  name: string;
+  thumbnail?: string;
+  description?: string;
+  brand?: string;
+  variant_count: number;
 };
 
 export type ErpWarehouse = {
-  id: string;
-  code: string;
+  id: number;
   name: string;
-  type?: string | null;
+  address?: string;
+  warehouse_type?: string;
+  status?: string;
 };
 
-export type ErpOperational = {
-  sku?: string;
-  product_id?: string;
-  min_stock?: number | null;
-  max_stock?: number | null;
-  reorder_point?: number | null;
-  safety_stock?: number | null;
-  is_fast_moving?: boolean | null;
+export type ErpChannel = {
+  id: number;
+  name: string;
+  status?: string;
+};
+
+/** `GET /api/to-be/bundle-stock` → satu bundle. */
+export type ErpBundleStock = {
+  sku: string;
+  is_bundle: boolean;
+  /** stok yang dilaporkan ERP apa adanya (kuota manual) */
+  stock_as_is: number;
+  /** MIN(⌊stok komponen / multiplier⌋) */
+  stock_to_be: number;
+  /** stock_as_is − stock_to_be; negatif = oversell, positif = understate */
+  phantom: number;
+  components: Array<{ component_sku: string; multiplier: number; stock: number }>;
+};
+
+export type ErpBundleStockSummary = {
+  total_bundles: number;
+  oversell: number;
+  understate: number;
+  matched: number;
+};
+
+/** `GET /api/to-be/sales-summary` */
+export type ErpSalesSummary = {
+  sales_order: Record<string, number>;
+  sales_product: Record<string, number>;
+  total_orders: number;
+};
+
+/**
+ * Status order ERP — HURUF KECIL, 10 nilai. Storefront memakai enum yang sama
+ * (di-uppercase untuk tampilan) supaya tidak ada penerjemahan yang bisa drift.
+ */
+export type ErpOrderStatus =
+  | "paid"
+  | "process"
+  | "picking"
+  | "packing"
+  | "packed"
+  | "ready_to_pickup"
+  | "sent"
+  | "completed"
+  | "cancelled"
+  | "returned";
+
+/** Satu baris `POST /v1/orders/page` (40 field, kunci = `reference_no`). */
+export type ErpOrder = {
+  id: number;
+  reference_no: string;
+  order_at: string;
+  created_at: string;
+  process_at?: string | null;
+  returned_at?: string | null;
+  deadline_at?: string | null;
+  qty: number;
+  amount: number;
+  cogs?: number | null;
+  shipping_fee?: number | null;
+  cod_fee?: number | null;
+  courier?: string | null;
+  courier_label?: string | null;
+  warehouse_name?: string | null;
+  channel_name?: string | null;
+  customer_username?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  customer_email?: string | null;
+  awb?: string | null;
+  product_summary?: string | null;
+  status: ErpOrderStatus;
+  status_mp?: string | null;
+  sent_at?: string | null;
+  updated_at?: string | null;
+};
+
+/** Respons `POST /api/webhooks/purchase-order`. */
+export type ErpPurchaseOrderResult = {
+  applied: boolean;
+  order_id: number;
+  reference_no: string;
+  status: ErpOrderStatus;
+  qty: number;
+  amount: number;
+  product_summary?: string;
+};
+
+/** Satu event di `GET /api/webhooks/wms?limit=`. */
+export type ErpWebhookEvent = {
+  id: number;
+  event_id: string;
+  event: string;
+  applied: number;
+  effect: string;
+  received_at: string;
 };
 
 export type ErpIntegrity = {
+  catalog_count_expected: number;
+  catalog_count_actual: number;
+  catalog_pagination_complete: boolean;
   duplicate_skus: string[];
-  orphan_boms: Array<{
-    target_sku: string;
-    missing_target: boolean;
-    missing_components: string[];
-  }>;
+  bundles_without_components: string[];
+  missing_components: Array<{ sku: string; missing: string[] }>;
   missing_price: string[];
   negative_stock: string[];
+  bundle_stock_summary: ErpBundleStockSummary | null;
   warehouse_breakdown_available: boolean;
 };
 
 export type ErpSnapshotData = {
-  products: ErpProduct[];
-  balances: ErpBalance[];
-  boms: ErpBom[];
+  products: ErpCatalogItem[];
+  catalogMeta: { count: number; pages: number; complete: boolean };
+  variants: ErpVariant[];
+  groups: ErpGroup[];
   warehouses: ErpWarehouse[];
-  operational: ErpOperational[];
+  channels: ErpChannel[];
+  bundleStock: { summary: ErpBundleStockSummary | null; bundles: ErpBundleStock[] };
+  salesSummary: ErpSalesSummary | null;
 };
 
 export type ErpSnapshot = {
-  version: 1;
+  version: 2;
+  contract: "perpack-replica";
   fetched_at: string;
-  source: { base_url: string; endpoints: Record<string, string> };
+  elapsed_ms: number;
+  source: {
+    base_url: string;
+    endpoints: Record<string, string>;
+    warehouse_stock: boolean;
+  };
   counts: {
     products: number;
-    balances: number;
-    boms: number;
+    variants: number;
+    groups: number;
     warehouses: number;
-    operational: number;
+    channels: number;
+    bundles: number;
   };
   integrity: ErpIntegrity;
   checksum: string;
   data: ErpSnapshotData;
+};
+
+/* ------------------------------------------------------------ Jalur B/4.2 --- */
+
+/** Konfigurasi gateway order (hasil `resolveErpOrderConfig`). */
+export type ErpOrderConfig = {
+  baseUrl: string;
+  token: string;
+  timeoutMs: number;
+  retries: number;
+  warehouseStock: boolean;
+  mode: "push" | "off";
+  strict: boolean;
+  sync: boolean;
+  stockOverlay: "webhook" | "local";
+  statusTtlMs: number;
+  channelId: number;
+};
+
+export type PushOrderResult = {
+  ok: boolean;
+  contract: "perpack-replica";
+  httpStatus?: number | null;
+  erpId?: number | null;
+  erpOrderRef?: string | null;
+  /** status storefront (UPPERCASE), hasil pemetaan dari enum ERP */
+  status?: string | null;
+  /** status mentah ERP (huruf kecil) */
+  rawStatus?: string | null;
+  applied?: boolean;
+  productSummary?: string | null;
+  note?: string | null;
+  error?: string | null;
+  raw?: unknown;
+};
+
+export type ErpOrderLookup = {
+  ok: boolean;
+  found: boolean;
+  ref: string;
+  erpId?: number | null;
+  rawStatus?: string | null;
+  status?: string | null;
+  trackingNo?: string | null;
+  courier?: string | null;
+  totalIdr?: number | null;
+  qty?: number | null;
+  productSummary?: string | null;
+  updatedAt?: string | null;
+  duplicates?: number;
+  error?: string | null;
+  raw?: unknown;
 };

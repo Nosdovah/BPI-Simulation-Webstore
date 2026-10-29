@@ -1,31 +1,47 @@
-import type { Product } from "../types";
-import type { ErpBalance, ErpProduct, ErpSnapshot } from "./types";
+import type { Product, WarehouseStock } from "../types";
+import type {
+  ErpBundleStock,
+  ErpCatalogItem,
+  ErpGroup,
+  ErpSnapshot,
+  ErpVariant,
+} from "./types";
 
 /**
  * Mapper ERP → bentuk `Product` yang dipakai storefront.
  *
  * Aturan: TIDAK ADA nilai data yang di-hardcode di sini. Semua field berasal dari
- * snapshot ERP. Yang ada di file ini hanya transformasi bentuk + penamaan UI.
+ * respons ERP. Yang ada di file ini hanya transformasi bentuk + penamaan UI.
+ *
+ * Sumber per field (kontrak replika Perpack):
+ *   sku / name / sell_price / is_bundle / components[]  ← /api/webhooks/catalog
+ *   stock_available                                     ← /api/webhooks/catalog
+ *   variation_label / variation_value / stocks[]        ← /v1/products/group/page
+ *   stock_to_be / phantom                               ← /api/to-be/bundle-stock
+ *   description / brand                                 ← /v1/products/group/page
  */
 
 export type CatalogMeta = {
   source: "snapshot" | "live";
+  contract: ErpSnapshot["contract"];
   baseUrl: string;
   fetchedAt: string;
   checksum: string;
   counts: ErpSnapshot["counts"];
   integrity: ErpSnapshot["integrity"];
+  /** KPI TO-BE dari ERP (AS-IS vs BOM) — dipakai halaman audit & paper. */
+  bundleStockSummary: ErpSnapshot["integrity"]["bundle_stock_summary"];
 };
 
 export type BuiltCatalog = {
   products: Product[];
   meta: CatalogMeta;
-  /** SKU yang muncul sebagai target BOM tetapi tidak ada di master products. */
+  /** SKU komponen yang dirujuk bundling tetapi tidak ada di master products. */
   orphanBomSkus: string[];
 };
 
 const slugify = (input: string) =>
-  input
+  String(input)
     .toLowerCase()
     .replace(/&/g, "and")
     .replace(/[^a-z0-9]+/g, "-")
@@ -36,157 +52,140 @@ const num = (value: unknown, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
-/** Segmen = brand master data. Dipakai sebagai dimensi filter di UI. */
-const segmentOf = (p: ErpProduct) => (p.brand || "UNBRANDED").trim().toUpperCase();
-
-/** Koleksi = item_type master data (`PREBUILT` → `prebuilt`). */
-const collectionOf = (p: ErpProduct) => slugify(p.item_type || "uncategorized");
-
-const sizeLabelOf = (p: ErpProduct) => p.category || p.uom || p.item_type || "—";
-
-const descriptionOf = (p: ErpProduct) => {
-  const parts = [
-    p.specs,
-    p.category ? `Kategori ${p.category}.` : null,
-    p.warranty ? `Garansi ${p.warranty}.` : null,
-    p.uom ? `Satuan ${p.uom}.` : null,
-  ].filter(Boolean);
-  return parts.join(" ").trim() || p.name;
+/** Ukuran ml dari SKU / nilai variasi (`M1058-...-20ml-A1` → 20). */
+const mlOf = (...candidates: Array<string | undefined>) => {
+  for (const c of candidates) {
+    const m = String(c ?? "").match(/(\d+)\s*ml/i);
+    if (m) return Number(m[1]);
+  }
+  return 0;
 };
+
+/**
+ * Segmen/filter. Diturunkan dari kode seri produk di SKU
+ * (`M1058-SagewoodSeaSalty-20ml-A1` → `M1058`) — pengelompokan nyata dari
+ * master data, bukan daftar brand karangan.
+ */
+const seriesOf = (sku: string) => {
+  const head = String(sku).split(/[-+]/)[0]?.trim();
+  return (head || "LAINNYA").toUpperCase();
+};
+
+/** Koleksi = tipe varian ERP; bundling dipisah supaya bisa difilter. */
+const collectionOf = (item: ErpCatalogItem, variant?: ErpVariant) => {
+  if (item.is_bundle) return "bundling";
+  const type = (variant?.type || "").trim();
+  return type ? slugify(type) : "satuan";
+};
+
+const stripHtml = (input?: string) =>
+  String(input ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+
+function warehouseStocksOf(variant?: ErpVariant): WarehouseStock[] {
+  if (!variant || !Array.isArray(variant.stocks)) return [];
+  return variant.stocks.map((s) => ({
+    warehouseId: Number(s.warehouse_id),
+    warehouseName: s.warehouse_name,
+    available: num(s.available),
+    reserved: num(s.reserved),
+  }));
+}
 
 export function buildCatalogFromSnapshot(
   snapshot: ErpSnapshot,
   source: CatalogMeta["source"] = "snapshot",
 ): BuiltCatalog {
-  const productBySku = new Map<string, ErpProduct>();
-  for (const p of snapshot.data.products) productBySku.set(p.sku, p);
+  const variantBySku = new Map<string, ErpVariant>();
+  for (const v of snapshot.data.variants ?? []) variantBySku.set(v.sku, v);
 
-  const balanceBySku = new Map<string, ErpBalance>();
-  for (const b of snapshot.data.balances) balanceBySku.set(b.sku, b);
+  const groupById = new Map<number, ErpGroup>();
+  for (const g of snapshot.data.groups ?? []) groupById.set(Number(g.id), g);
 
-  const products: Product[] = [];
+  const bundleStockBySku = new Map<string, ErpBundleStock>();
+  for (const b of snapshot.data.bundleStock?.bundles ?? []) bundleStockBySku.set(b.sku, b);
+
+  const masterSkus = new Set(snapshot.data.products.map((p) => p.sku));
   const orphanBomSkus: string[] = [];
 
-  const nextId = () => products.length + 1;
+  const products: Product[] = snapshot.data.products.map((item, index) => {
+    const variant = variantBySku.get(item.sku);
+    const group = groupById.get(Number(item.product_group_id));
+    const bundleStock = bundleStockBySku.get(item.sku);
 
-  /** 1. BOM → produk bundle. Target yang tidak ada di master tetap dicatat (orphan). */
-  const bundleTargets = new Set<string>();
-
-  for (const bom of snapshot.data.boms) {
-    const target = productBySku.get(bom.target_sku);
-    const rawComponents = Array.isArray(bom.components) ? bom.components : [];
-    const resolvedComponents = rawComponents.filter((c) => productBySku.has(c.component_sku));
-
-    if (!target) {
-      orphanBomSkus.push(bom.target_sku);
-    }
-
-    bundleTargets.add(bom.target_sku);
-
-    const components = resolvedComponents.map((c) => ({
+    const components = (Array.isArray(item.components) ? item.components : []).map((c) => ({
       materialCode: c.component_sku,
-      multiplierQty: Math.max(1, Math.round(num(c.qty, 1))),
+      multiplierQty: Math.max(1, Math.round(num(c.multiplier_qty, 1))),
     }));
 
-    const rawSum = resolvedComponents.reduce((acc, c) => {
-      const comp = productBySku.get(c.component_sku);
-      return acc + num(comp?.unit_price) * Math.max(1, Math.round(num(c.qty, 1)));
-    }, 0);
+    if (item.is_bundle) {
+      for (const c of components) {
+        if (!masterSkus.has(c.materialCode) && !orphanBomSkus.includes(c.materialCode)) {
+          orphanBomSkus.push(c.materialCode);
+        }
+      }
+    }
 
-    const labor = num(bom.labor_cost);
-    const overhead = num(bom.overhead_cost);
-    // Harga jual = komponen + tenaga kerja + overhead. compareAt hanya ditampilkan
-    // bila benar-benar lebih tinggi dari harga jual (hindari coret sama nilai).
-    const bundlePrice = rawSum > 0 ? rawSum + labor + overhead : labor + overhead;
-    // Kuota manual = stok yang dilaporkan ERP untuk SKU target (bukan hasil hitung komponen).
-    const manualQuota = num(
-      balanceBySku.get(bom.target_sku)?.stock_on_hand ?? target?.stock,
-      0,
-    );
+    const asIs = num(item.stock_available);
+    const toBe = item.is_bundle && bundleStock ? num(bundleStock.stock_to_be) : asIs;
+    const phantom = item.is_bundle && bundleStock ? num(bundleStock.phantom) : 0;
 
-    products.push({
-      id: nextId(),
-      sku: bom.target_sku,
-      slug: slugify(bom.target_sku),
-      name: target?.name ?? bom.name ?? bom.target_sku,
-      scent: target?.brand ?? "",
-      gender: target ? segmentOf(target) : "UNBRANDED",
-      collection: target ? collectionOf(target) : "assembly",
-      sizeLabel: `Assembly ${components.length} komponen`,
-      sizeMl: 0,
-      kind: "BUNDLE",
-      priceIdr: bundlePrice,
-      compareAtIdr: rawSum > bundlePrice ? rawSum : null,
-      imageKey: bom.target_sku,
-      isBundle: true,
-      materialCode: null,
+    const sizeLabel =
+      variant?.variation_value?.trim() ||
+      (variant?.variation_label ? `${variant.variation_label} —` : "") ||
+      (variant?.weight ? `${variant.weight} g` : "—");
+
+    return {
+      id: Number(item.id ?? index + 1),
+      sku: item.sku,
+      slug: slugify(item.sku),
+      name: item.name,
+      scent: variant?.variation_value?.trim() || item.alias || seriesOf(item.sku),
+      gender: seriesOf(item.sku),
+      collection: collectionOf(item, variant),
+      sizeLabel,
+      sizeMl: mlOf(variant?.variation_value, item.sku, item.name),
+      kind: item.is_bundle ? "BUNDLE" : "EDP",
+      priceIdr: num(item.sell_price),
+      compareAtIdr: null,
+      imageKey: item.sku,
+      isBundle: Boolean(item.is_bundle),
+      materialCode: item.is_bundle ? null : item.sku,
       components,
-      stockOnHand: manualQuota,
-      stockPerWarehouse: [],
+      stockOnHand: asIs,
+      stockToBe: toBe,
+      phantom,
+      stockPerWarehouse: warehouseStocksOf(variant),
       notes: {
-        top: [bom.version ? `BOM ${bom.version}` : "BOM"],
-        heart: components.length ? [`${components.length} komponen`] : ["komposisi tidak lengkap"],
-        base: [target?.warranty ?? "—"],
+        top: [variant?.variation_label || "—", variant?.variation_value || "—"].filter(Boolean),
+        heart: [item.alias || item.sku_code || "—"],
+        base: [item.is_bundle ? `Bundling ${components.length} komponen` : "Satuan"],
       },
       description:
-        `${bom.name ? `${bom.name}. ` : ""}` +
-        (components.length
-          ? `Dirakit dari ${components.length} komponen master: ` +
-            resolvedComponents
-              .map((c) => `${c.component_sku} x${Math.max(1, Math.round(num(c.qty, 1)))}`)
-              .join(", ") +
-            "."
-          : "Komposisi BOM tidak dapat dipetakan ke master produk — angka stok paket tidak bisa dihitung.") +
-        (labor || overhead ? ` Biaya jasa rakit ${labor}, overhead ${overhead}.` : ""),
-    });
-  }
-
-  /** 2. Master product → produk satuan (target BOM dilewati karena sudah jadi bundle). */
-  for (const p of snapshot.data.products) {
-    if (bundleTargets.has(p.sku)) continue;
-
-    const balance = balanceBySku.get(p.sku);
-    const price = num(p.unit_price, num(p.wholesale_price, 0));
-    const wholesale = num(p.wholesale_price, 0);
-
-    products.push({
-      id: nextId(),
-      sku: p.sku,
-      slug: slugify(p.sku),
-      name: p.name,
-      scent: p.brand ?? "",
-      gender: segmentOf(p),
-      collection: collectionOf(p),
-      sizeLabel: sizeLabelOf(p),
-      sizeMl: 0,
-      kind: p.item_type === "PREBUILT" ? "EXTRAIT" : "EDP",
-      priceIdr: price,
-      compareAtIdr: wholesale > price && price > 0 ? wholesale : null,
-      imageKey: p.sku,
-      isBundle: false,
-      materialCode: p.sku,
-      components: [],
-      stockOnHand: num(balance?.stock_on_hand ?? p.stock, 0),
-      // ERP belum mengirim stok per gudang; sengaja dikosongkan daripada dikarang.
-      stockPerWarehouse: [],
-      notes: {
-        top: [p.brand ?? "—"],
-        heart: [p.category ?? p.item_type ?? "—"],
-        base: [p.warranty ?? "—"],
-      },
-      description: descriptionOf(p),
-    });
-  }
+        stripHtml(group?.description) ||
+        (item.is_bundle && components.length
+          ? `Paket bundling dari ${components
+              .map((c) => `${c.materialCode} ×${c.multiplierQty}`)
+              .join(", ")}.`
+          : item.name),
+    };
+  });
 
   return {
     products,
     meta: {
       source,
+      contract: snapshot.contract,
       baseUrl: snapshot.source.base_url,
       fetchedAt: snapshot.fetched_at,
       checksum: snapshot.checksum,
       counts: snapshot.counts,
       integrity: snapshot.integrity,
+      bundleStockSummary: snapshot.integrity?.bundle_stock_summary ?? null,
     },
     orphanBomSkus,
   };
@@ -211,7 +210,7 @@ export function collectionsOf(products: Product[]) {
   return Array.from(seen.values()).sort((a, b) => b.total - a.total);
 }
 
-/** Segmen (brand) untuk filter, urut dari jumlah SKU terbanyak. */
+/** Segmen (seri produk) untuk filter, urut dari jumlah SKU terbanyak. */
 export function segmentsOf(products: Product[]) {
   const counts = new Map<string, number>();
   for (const p of products) counts.set(p.gender, (counts.get(p.gender) ?? 0) + 1);

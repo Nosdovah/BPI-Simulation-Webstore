@@ -43,8 +43,12 @@ export type Product = {
   isBundle: boolean;
   materialCode: string | null;
   components: Array<{ materialCode: string; multiplierQty: number }>;
-  /** Stok on-hand dari sistem inventori ERP untuk SKU satuan / komponen. */
+  /** Stok on-hand dari ERP (`stock_available`) — angka AS-IS, apa adanya. */
   stockOnHand: number;
+  /** Stok hasil hitung BOM MIN(⌊stok komponen / multiplier⌋) — angka TO-BE. */
+  stockToBe: number;
+  /** `stock_as_is − stock_to_be`; negatif = oversell, positif = understate. */
+  phantom: number;
   stockPerWarehouse: WarehouseStock[];
   notes: { top: string[]; heart: string[]; base: string[] };
   description: string;
@@ -85,18 +89,38 @@ export type OrderItem = {
   priceIdr: number;
 };
 
-/** Sepuluh tahap status baku. Tidak ada enum liar di luar daftar ini. */
+/** Sepuluh status baku ERP (replika Perpack) — huruf besar untuk tampilan. */
 export type OrderStatus =
   | "PAID"
-  | "PROCESSING"
+  | "PROCESS"
   | "PICKING"
+  | "PACKING"
   | "PACKED"
-  | "HANDOVER_TO_COURIER"
-  | "IN_TRANSIT"
-  | "ARRIVED_AT_HUB"
-  | "OUT_FOR_DELIVERY"
-  | "DELIVERED"
-  | "COMPLETED";
+  | "READY_TO_PICKUP"
+  | "SENT"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "RETURNED";
+
+/**
+ * Jejak integrasi Jalur B (Webstore → Modul 4.2 Order & Status di ERP).
+ *
+ * `status` di sini adalah salinan terakhir yang diterima dari ERP; sumber
+ * kebenarannya tetap ERP. `rawStatus` disimpan apa adanya supaya bisa diaudit
+ * saat enum ERP berubah.
+ */
+export type ErpLink = {
+  contract: "perpack-replica" | "none";
+  orderRef: string;
+  erpId: number | null;
+  status: OrderStatus | null;
+  rawStatus: string | null;
+  trackingNo: string | null;
+  pushedAt: number | null;
+  lastSyncAt: number | null;
+  lastSyncSource: "push" | "poll" | "webhook" | null;
+  error: string | null;
+};
 
 export type Order = {
   ref: string;
@@ -119,4 +143,6 @@ export type Order = {
   trackingNo: string | null;
   actorLast: "SYSTEM" | "STAFF";
   note: string | null;
+  /** Null = order tidak (belum) terhubung ke ERP. */
+  erp: ErpLink | null;
 };

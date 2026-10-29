@@ -14,15 +14,31 @@ export type ResolvedStock = {
 export type ComponentStockMap = Map<string, number>;
 
 /**
+ * Mode tampilan stok bundling:
+ *
+ *   as-is (default) → angka `stock_available` dari ERP apa adanya. Ini yang
+ *                     dilihat pelanggan di replika Perpack, termasuk kalau
+ *                     angkanya lebih besar dari kapasitas komponen (phantom).
+ *   to-be           → hitung MIN(⌊stok komponen / multiplier⌋), sama dengan
+ *                     `/api/to-be/bundle-stock`. Dipakai saat simulasi
+ *                     perbaikan BOM (TO-BE) di paper DMAIC.
+ */
+export type StockMode = "as-is" | "to-be";
+
+export function stockMode(env = process.env): StockMode {
+  return String(env.OSR_STOCK_MODE ?? "as-is").toLowerCase() === "to-be" ? "to-be" : "as-is";
+}
+
+/**
  * Satu-satunya tempat logika tampilan stok hidup di sisi UI.
  *
- *  - SKU satuan  : stok on-hand dikurangi penjualan sesi
- *  - SKU rakitan : dihitung dari komponen pembatas, gagal terang-terangan
- *                  kalau komposisi tidak tersedia
+ *  - SKU satuan  : stok `stock_available` dikurangi penjualan sesi
+ *  - SKU rakitan : AS-IS = angka ERP; TO-BE = komponen pembatas (BOM MIN)
  */
 export function resolveStockDisplay(
   p: Product,
   componentStocks: ComponentStockMap,
+  mode: StockMode = stockMode(),
 ): ResolvedStock {
   if (!p.isBundle) {
     const sold = p.materialCode ? getSold(p.materialCode) : 0;
@@ -45,6 +61,20 @@ export function resolveStockDisplay(
     };
   }
 
+  if (mode === "as-is") {
+    const sold = getSold(p.sku);
+    return {
+      value: Math.max(0, p.stockOnHand - sold),
+      label:
+        p.phantom !== 0
+          ? `Stok ERP AS-IS (BOM ${p.stockToBe}, selisih ${p.phantom > 0 ? "+" : ""}${p.phantom})`
+          : `Stok ERP AS-IS · ${p.components.length} komponen`,
+      aware: true,
+      error: null,
+      computed: false,
+    };
+  }
+
   const perComponent = p.components.map((c) => {
     const stock = componentStocks.get(c.materialCode) ?? 0;
     return {
@@ -60,7 +90,7 @@ export function resolveStockDisplay(
 
   return {
     value: Math.max(0, bottleneck.capacity),
-    label: `Bundling ${p.components.length} botol`,
+    label: `BOM MIN ${p.components.length} komponen`,
     aware: true,
     error: null,
     computed: true,
