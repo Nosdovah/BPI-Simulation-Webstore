@@ -11,7 +11,9 @@ const NAV = [
   { href: "/blog", label: "Blog" },
 ];
 
-export function Header() {
+export type HeaderAccount = { name: string; href: string; label: string } | null;
+
+export function Header({ account = null }: { account?: HeaderAccount }) {
   const { count } = useCart();
   const pathname = usePathname();
 
@@ -47,6 +49,19 @@ export function Header() {
             <Link href="/wishlist" className="nav-link hidden sm:inline">
               Wishlist
             </Link>
+            {account ? (
+              <Link
+                href={account.href}
+                className="nav-link hidden max-w-[160px] truncate sm:inline"
+                title={account.name}
+              >
+                {account.label}
+              </Link>
+            ) : (
+              <Link href="/login" className="nav-link hidden sm:inline">
+                Masuk
+              </Link>
+            )}
             <Link href="/cart" className="nav-link flex items-center gap-1">
               Cart
               <span className="inline-flex h-5 min-w-5 items-center justify-center border border-ink/30 px-1 text-[10px] leading-none">

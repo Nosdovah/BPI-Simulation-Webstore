@@ -28,6 +28,10 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# data user lokal — memuat hash password, jangan pernah di-commit
+/.data/users.json
+/.data/osr-*
 # runtime webhook log (jangan commit)
 /.data/*
 # kecuali snapshot master data ERP — sengaja di-commit supaya build & run
