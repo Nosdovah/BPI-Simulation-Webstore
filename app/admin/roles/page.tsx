@@ -34,13 +34,16 @@ function grouped(): Array<{ resource: string; items: Permission[] }> {
 }
 
 function Mark({ on }: { on: boolean }) {
+  // Glyph dipilih supaya beda antara "diizinkan" dan "tidak" terbaca dari
+  // bentuk, bukan hanya dari kontras warna — titik kecil abu-abu mudah
+  // disalahartikan sebagai sel kosong saat dipindai cepat.
   return on ? (
-    <span className="text-ink" aria-label="diizinkan">
+    <span className="font-bold text-ink" aria-label="diizinkan">
       ●
     </span>
   ) : (
-    <span className="text-ink/20" aria-label="tidak diizinkan">
-      ·
+    <span className="text-ink/35" aria-label="tidak diizinkan">
+      —
     </span>
   );
 }
@@ -203,10 +206,10 @@ export default function RolesMatrixPage() {
 
         <div className="mt-3 flex flex-wrap gap-4 text-[10px] uppercase tracking-widest2 text-smoke">
           <span>
-            <span className="text-ink">●</span> diizinkan
+            <span className="font-bold text-ink">●</span> diizinkan
           </span>
           <span>
-            <span className="text-ink/20">·</span> tidak diizinkan
+            <span className="text-ink/35">—</span> tidak diizinkan
           </span>
           <span>SUPER_ADMIN memegang wildcard *</span>
         </div>
