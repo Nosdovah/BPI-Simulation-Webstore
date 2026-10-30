@@ -143,6 +143,14 @@ export async function GET(request: Request) {
   const emailErr = validateEmail(email);
   if (emailErr) return bad("INVALID_EMAIL", emailErr);
 
-  const existing = await findByEmail(email);
-  return NextResponse.json({ ok: true, email, available: !existing });
+  try {
+    const existing = await findByEmail(email);
+    return NextResponse.json({ ok: true, email, available: !existing });
+  } catch (err) {
+    return bad(
+      "AUTH_BACKEND_UNAVAILABLE",
+      err instanceof Error ? err.message : "Penyimpanan akun tidak bisa diakses.",
+      503,
+    );
+  }
 }

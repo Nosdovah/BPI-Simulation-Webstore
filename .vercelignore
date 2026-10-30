@@ -9,6 +9,7 @@
 
 # Data user & log runtime — jangan pernah ikut deploy
 .data/users.json
+.data/cart.json
 .data/osr-*
 .data/webhook-events.jsonl
 

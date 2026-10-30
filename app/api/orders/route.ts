@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { addSold, pushTelemetry } from "@/lib/state";
 import { findProductsBySkus, findProduct } from "@/lib/catalog";
 import { checkStock } from "@/lib/core";
+import { currentSession } from "@/lib/auth/guard";
+import { consumeCart } from "@/lib/cart-server";
 import {
   applyErpPush,
   buildOrder,
@@ -191,6 +193,20 @@ export async function POST(request: Request) {
   }
 
   rememberOrder(order);
+
+  /* Keranjang server-side dikosongkan setelah order benar-benar tercatat.
+   * Hanya untuk pengguna yang punya sesi: checkout tamu tidak menyentuh
+   * keranjang siapa pun. Kegagalan di sini tidak membatalkan order — order
+   * sudah sah, keranjang hanya perlu dibersihkan. */
+  const session = currentSession();
+  if (session) {
+    try {
+      await consumeCart(session.uid);
+    } catch (err) {
+      pushTelemetry({ event: "cart_consume_failed", ref: order.ref, error: String(err) });
+    }
+  }
+
   pushTelemetry({
     event: "order_created",
     ref: order.ref,

@@ -41,7 +41,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const user = await findByEmail(email);
+  let user;
+  try {
+    user = await findByEmail(email);
+  } catch (err) {
+    // Backend user (Supabase) tidak bisa dihubungi. Jangan berpura-pura
+    // kredensial salah — pengguna harus tahu ini masalah sistem, bukan
+    // salah ketik password.
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "AUTH_BACKEND_UNAVAILABLE",
+        message: err instanceof Error ? err.message : "Penyimpanan akun tidak bisa diakses.",
+      },
+      { status: 503 }
+    );
+  }
   if (!user) {
     return NextResponse.json(
       { ok: false, error: "INVALID_CREDENTIALS", message: "Email atau password salah." },
