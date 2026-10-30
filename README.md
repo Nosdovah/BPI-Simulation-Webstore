@@ -60,8 +60,8 @@ ERP REST API ──npm run erp:sync──► .data/erp/catalog.snapshot.json ─
 - Kalau snapshot tidak ada, aplikasi gagal terang-terangan dengan pesan perbaikan —
   tidak diam-diam memakai data contoh.
 
-Kontrak integrasi lengkap ada di `docs/INTEGRASI_ERP_CATALOG.md` dan
-`docs/PANDUAN_KONEKSI_ERP_WEBSTORE.md`.
+Kontrak integrasi aktif ada di `docs/KONTRAK_API_ERP.md`; versi acuan resmi dan
+panduan koneksi lama diarsipkan di `docs/arsip/`.
 
 ## 5. Struktur
 
@@ -96,3 +96,15 @@ scripts/
 - Webhook butuh bearer token (`OSR_WEBHOOK_TOKEN`) dan opsional
   `X-OSR-Signature: sha256=<hmac>`; tanpa secret, signature tidak diwajibkan.
 - `robots: noindex, nofollow` aktif agar tidak terindeks mesin pencari.
+
+## 7. Dokumentasi
+
+| Dokumen | Isi |
+|---|---|
+| `docs/DOKUMEN_RBAC.md` · [PDF](docs/DOKUMEN_RBAC.pdf) | Skema RBAC storefront & panel admin (v1.2) — peran, 15 izin, sesi token, audit log |
+| `docs/SLUG_WEBSTORE.md` · [PDF](docs/SLUG_WEBSTORE.pdf) | Spesifikasi slug kanonik tiap halaman webstore & admin (v1.1) |
+| `docs/KONTRAK_API_ERP.md` | Kontrak API ERP aktif yang dipakai `erp:sync` |
+| `docs/INTEGRASI_WEBHOOK_ERP.md` | Alur webhook event ERP/WMS ke repo ini |
+| `docs/arsip/` | Versi lama kontrak, panduan koneksi, dan acuan resmi |
+
+Dokumen `.md` adalah sumber; `.pdf` adalah hasil render untuk dibagikan.
