@@ -1,0 +1,23 @@
+# ------------------------------------------------------------------
+# .vercelignore — apa yang TIDAK ikut diunggah saat `vercel deploy`
+#
+# Penting: Vercel CLI mengunggah isi direktori kerja dan TIDAK membaca
+# .gitignore. Tanpa berkas ini, data runtime lokal (termasuk hash password
+# di .data/users.json) akan ikut ter-deploy. Snapshot ERP di .data/erp/
+# sengaja TETAP diunggah karena dibutuhkan saat runtime.
+# ------------------------------------------------------------------
+
+# Data user & log runtime — jangan pernah ikut deploy
+.data/users.json
+.data/osr-*
+.data/webhook-events.jsonl
+
+# Berkas pengembangan
+node_modules
+.next
+.git
+docs/arsip
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+.env.local
+.env*.local

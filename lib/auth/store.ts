@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "./password";
@@ -37,11 +37,32 @@ type Resolved = { path: string; backend: StoreBackend };
 
 let resolved: Resolved | null = null;
 
+/**
+ * Uji tulis sungguhan, bukan sekadar `mkdir` berhasil.
+ *
+ * Di Vercel, direktori `.data` sudah ada (ikut ter-bundle karena memuat
+ * snapshot ERP), jadi `mkdirSync(..., {recursive:true})` TIDAK melempar
+ * error walaupun sistem berkasnya read-only. Tanpa probe ini, backend akan
+ * melaporkan "file" padahal setiap penulisan gagal diam-diam.
+ */
+function isWritableDir(dir: string): boolean {
+  const probe = path.join(dir, `.probe-${process.pid}-${Date.now()}`);
+  try {
+    writeFileSync(probe, "ok", "utf8");
+    unlinkSync(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function resolveFilePath(): Resolved | null {
   if (resolved) return resolved;
   for (const candidate of FILE_CANDIDATES) {
     try {
-      mkdirSync(path.dirname(candidate.path), { recursive: true });
+      const dir = path.dirname(candidate.path);
+      mkdirSync(dir, { recursive: true });
+      if (!isWritableDir(dir)) continue;
       resolved = candidate;
       return candidate;
     } catch {
