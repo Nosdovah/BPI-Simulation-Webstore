@@ -120,7 +120,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "SKU_NOT_FOUND", sku }, { status: 404 });
   }
 
-  const qty = clampQty(body.qty ?? 1);
+  const rawQty = Number(body.qty ?? 1);
+  if (!Number.isFinite(rawQty) || rawQty <= 0) {
+    return NextResponse.json({ error: "QTY_INVALID" }, { status: 400 });
+  }
+  const qty = clampQty(rawQty);
 
   // Validasi stok atas TOTAL setelah penambahan, bukan hanya delta-nya.
   try {
