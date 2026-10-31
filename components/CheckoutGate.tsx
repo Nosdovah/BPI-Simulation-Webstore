@@ -124,8 +124,11 @@ export function CheckoutGate() {
                       className="flex items-start gap-4 border-b border-ink/10 py-4"
                     >
                       <div className="h-16 w-16 shrink-0 bg-mist" />
-                      <div className="flex-1">
-                        <p className="text-sm">{item?.name ?? line.sku}</p>
+                      {/* `min-w-0` wajib: judul produk Octarine panjang (60+ karakter)
+                          dan tanpa ini flex item menolak menyusut, sehingga harga di
+                          kanan terdorong keluar kontainer. */}
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words text-sm">{item?.name ?? line.sku}</p>
                         <p className="mt-1 text-[11px] uppercase tracking-widest2 text-smoke">
                           {item?.isBundle ? "Bundling" : item?.sizeLabel ?? "—"}
                         </p>
@@ -136,7 +139,7 @@ export function CheckoutGate() {
                           Ubah di keranjang
                         </Link>
                       </div>
-                      <p className="whitespace-nowrap text-sm">
+                      <p className="shrink-0 whitespace-nowrap text-sm">
                         {line.qty} × {formatIdr(item?.priceIdr ?? 0)}
                       </p>
                     </div>
