@@ -56,14 +56,23 @@ export async function GET(
 ) {
   const url = new URL(request.url);
   const token = url.searchParams.get("k");
-  const order = recallOrder(params.ref) ?? readOrderToken(token);
 
-  if (!order) {
+  /*
+   * Urutan WAJIB: token diverifikasi lebih dulu, BARU cache dipakai.
+   * Sebelumnya `recallOrder(ref) ?? readOrderToken(token)` membuat lambda yang
+   * masih hangat mengembalikan order + PII ke siapa pun yang menebak `ref`,
+   * tanpa token sama sekali (temuan C-06). Cache hanya boleh memperkaya
+   * render untuk pemilik token yang sah.
+   */
+  const verified = readOrderToken(token);
+  if (!verified || verified.ref !== params.ref) {
     return NextResponse.json(
       { error: "ORDER_NOT_FOUND", message: "Order tidak ditemukan atau token tidak valid." },
       { status: 404 },
     );
   }
+  const cached = recallOrder(params.ref);
+  const order = cached && cached.ref === verified.ref ? cached : verified;
 
   /* Jalur B: tarik status terakhir dari ERP (Modul 4.2). */
   const cfg = resolveErpOrderConfig();

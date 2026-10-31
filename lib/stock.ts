@@ -34,14 +34,19 @@ export function stockMode(env = process.env): StockMode {
  *
  *  - SKU satuan  : stok `stock_available` dikurangi penjualan sesi
  *  - SKU rakitan : AS-IS = angka ERP; TO-BE = komponen pembatas (BOM MIN)
+ *
+ * `soldLookup` bisa diganti pemanggil. Saat overlay stok live dari ERP aktif,
+ * penjualan SUDAH dipotong oleh ERP (`stock_deducted`), jadi pemanggil mengirim
+ * `() => 0` — kalau tidak, satu penjualan memotong tampilan dua kali.
  */
 export function resolveStockDisplay(
   p: Product,
   componentStocks: ComponentStockMap,
   mode: StockMode = stockMode(),
+  soldLookup: (key: string) => number = getSold,
 ): ResolvedStock {
   if (!p.isBundle) {
-    const sold = p.materialCode ? getSold(p.materialCode) : 0;
+    const sold = p.materialCode ? soldLookup(p.materialCode) : 0;
     return {
       value: Math.max(0, p.stockOnHand - sold),
       label: null,
@@ -62,7 +67,7 @@ export function resolveStockDisplay(
   }
 
   if (mode === "as-is") {
-    const sold = getSold(p.sku);
+    const sold = soldLookup(p.sku);
     return {
       value: Math.max(0, p.stockOnHand - sold),
       label:

@@ -153,6 +153,28 @@ async function main() {
   } else {
     console.log("  ✓ integritas referensial bersih");
   }
+
+  if (snapshot.integrity.duplicates_dropped > 0) {
+    console.log(
+      `  ⚠ ${snapshot.integrity.duplicates_dropped} baris duplikat DIBUANG dari snapshot ` +
+        `(${snapshot.integrity.duplicates_dropped_skus.slice(0, 5).join(", ")}…)`,
+    );
+  }
+
+  /*
+   * Gate A-15: SKU ganda di master data = cacat harga (satu SKU bisa tampil
+   * dengan dua harga). Snapshot tetap ditulis dalam keadaan sudah didedupe,
+   * tetapi proses keluar dengan kode 1 supaya pipeline/deploy berhenti.
+   */
+  if (integrity.duplicate_skus.length > 0) {
+    console.error(
+      `✗ GATE GAGAL: ${integrity.duplicate_skus.length} SKU duplikat di master data ERP ` +
+        `(${integrity.duplicate_skus.slice(0, 5).join(", ")}). ` +
+        "Snapshot ditulis dalam keadaan sudah didedupe, tetapi sync dianggap gagal. " +
+        "Perbaiki sumber di ERP lalu ulangi.",
+    );
+    process.exit(1);
+  }
 }
 
 main().catch((err) => {

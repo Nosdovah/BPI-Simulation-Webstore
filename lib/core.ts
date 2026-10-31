@@ -1,6 +1,7 @@
 import { getCatalog, findProductsBySkus, findProduct } from "./catalog";
 import { getSold } from "./state";
-import { resolveStockDisplay, type ComponentStockMap } from "./stock";
+import { resolveStockDisplay, stockMode, type ComponentStockMap, type StockMode } from "./stock";
+import { liveStockSync } from "./erp/live-stock";
 import type {
   BundleComponent,
   Gender,
@@ -14,32 +15,93 @@ import type {
  *
  * Di arsitektur penuh storefront memanggil core lewat HTTP. Di repo ini core
  * dijalankan in-process supaya webstore bisa berdiri sendiri tanpa Docker.
+ *
+ * ---------------------------------------------------------------- overlay ---
+ * Kalau `lib/erp/live-stock.ts` punya angka ERP (±30 detik), angka itu yang
+ * dipakai untuk stok & harga; snapshot hanya menyumbang master data (nama,
+ * komposisi BOM, gambar). Efeknya:
+ *
+ *   - `stockDisplay` storefront = `stock_available` ERP  → uji A-04 = 0 selisih
+ *   - penjualan tidak dikurangi lagi (ERP sudah memotong) → tidak dobel
+ *   - ERP mati → otomatis kembali ke angka snapshot terakhir, bukan nol
  */
 
+type OverlayCtx = {
+  /** true kalau angka stok berasal dari overlay ERP, bukan snapshot */
+  live: boolean;
+  lookup: (p: Product) => { stock: number; sellPrice: number } | null;
+};
+
+function overlay(): OverlayCtx {
+  const st = liveStockSync();
+  if (!st.index || st.index.size === 0) {
+    return { live: false, lookup: () => null };
+  }
+  return {
+    live: true,
+    lookup: (p: Product) => {
+      const hit = st.index!.get(p.sku) ?? (p.materialCode ? st.index!.get(p.materialCode) : undefined);
+      return hit ? { stock: hit.stock, sellPrice: hit.sellPrice } : null;
+    },
+  };
+}
+
+/** Produk dengan angka stok/harga dari ERP live (kalau tersedia). */
+function withLive(p: Product, ctx: OverlayCtx): Product {
+  if (!ctx.live) return p;
+  const hit = ctx.lookup(p);
+  if (!hit) return p;
+  return {
+    ...p,
+    stockOnHand: hit.stock,
+    priceIdr: hit.sellPrice > 0 ? hit.sellPrice : p.priceIdr,
+  };
+}
+
+/**
+ * Peta stok komponen. Saat overlay hidup, `getSold()` diabaikan untuk SKU yang
+ * ada di overlay — ERP sudah mengurangi stoknya sendiri.
+ */
 export function componentStocks(): ComponentStockMap {
+  const ctx = overlay();
   const map: ComponentStockMap = new Map();
   for (const p of getCatalog()) {
     if (!p.isBundle && p.materialCode) {
-      map.set(p.materialCode, Math.max(0, p.stockOnHand - getSold(p.materialCode)));
+      const hit = ctx.live ? ctx.lookup(p) : null;
+      const base = hit ? hit.stock : p.stockOnHand;
+      const sold = hit ? 0 : getSold(p.materialCode);
+      map.set(p.materialCode, Math.max(0, base - sold));
     }
   }
   return map;
 }
 
-export function toCard(p: Product, stocks: ComponentStockMap): ProductCard {
-  const stock = resolveStockDisplay(p, stocks);
+export function toCard(
+  p: Product,
+  stocks: ComponentStockMap,
+  ctx: OverlayCtx = overlay(),
+  mode: StockMode = stockMode(),
+): ProductCard {
+  const source = withLive(p, ctx);
+  const stock = resolveStockDisplay(
+    source,
+    stocks,
+    mode,
+    // Overlay hidup = ERP pemilik pengurangan stok.
+    ctx.live ? () => 0 : getSold,
+  );
   return {
-    id: p.id,
-    sku: p.sku,
-    slug: p.slug,
-    name: p.name,
-    gender: p.gender,
-    collection: p.collection,
-    priceIdr: p.priceIdr,
-    compareAtIdr: p.compareAtIdr,
-    imageKey: p.imageKey,
-    isBundle: p.isBundle,
-    sizeLabel: p.sizeLabel,
+    id: source.id,
+    sku: source.sku,
+    slug: source.slug,
+    name: source.name,
+    gender: source.gender,
+    collection: source.collection,
+    priceIdr: source.priceIdr,
+    compareAtIdr: source.compareAtIdr,
+    imageKey: source.imageKey,
+    isBundle: source.isBundle,
+    sizeLabel: source.sizeLabel,
     stockDisplay: stock.value,
     stockLabel: stock.label,
     stockAware: stock.aware,
@@ -47,16 +109,22 @@ export function toCard(p: Product, stocks: ComponentStockMap): ProductCard {
   };
 }
 
-export function toDetail(p: Product, stocks: ComponentStockMap): ProductDetail {
-  const card = toCard(p, stocks);
+export function toDetail(
+  p: Product,
+  stocks: ComponentStockMap,
+  ctx: OverlayCtx = overlay(),
+  mode: StockMode = stockMode(),
+): ProductDetail {
+  const card = toCard(p, stocks, ctx, mode);
   const bundleComponents: BundleComponent[] = p.components.map((c) => {
     const componentProduct = findProduct(c.materialCode);
+    const liveHit = ctx.live ? ctx.lookup(componentProduct ?? p) : null;
     return {
       sku: componentProduct?.sku ?? c.materialCode,
       materialCode: c.materialCode,
       name: componentProduct?.name ?? c.materialCode,
       multiplierQty: c.multiplierQty,
-      componentStock: stocks.get(c.materialCode) ?? 0,
+      componentStock: liveHit ? liveHit.stock : stocks.get(c.materialCode) ?? 0,
     };
   });
 
@@ -78,6 +146,8 @@ export type ListParams = {
   perPage?: number;
   sort?: "featured" | "price-asc" | "price-desc" | "stock-desc";
   bundlesOnly?: boolean;
+  /** override mode tampilan stok (TO-BE = kapasitas BOM) untuk demo before→after */
+  stockMode?: StockMode;
 };
 
 export type ListResult = {
@@ -98,8 +168,11 @@ export function listProducts(params: ListParams): ListResult {
     perPage = 48,
     sort = "featured",
     bundlesOnly = false,
+    stockMode: modeOverride,
   } = params;
 
+  const mode: StockMode = modeOverride ?? stockMode();
+  const ctx = overlay();
   const stocks = componentStocks();
   const needle = q?.trim().toLowerCase();
 
@@ -119,16 +192,18 @@ export function listProducts(params: ListParams): ListResult {
     const rank = (p: Product) => (p.isBundle ? (p.components.length > 0 ? 0 : 2) : 1);
     filtered = [...filtered].sort((a, b) => rank(a) - rank(b));
   }
-  if (sort === "price-asc") filtered = [...filtered].sort((a, b) => a.priceIdr - b.priceIdr);
-  if (sort === "price-desc") filtered = [...filtered].sort((a, b) => b.priceIdr - a.priceIdr);
 
-  const total = filtered.length;
+  const priced = filtered.map((p) => withLive(p, ctx));
+  if (sort === "price-asc") priced.sort((a, b) => a.priceIdr - b.priceIdr);
+  if (sort === "price-desc") priced.sort((a, b) => b.priceIdr - a.priceIdr);
+
+  const total = priced.length;
   const totalPages = Math.max(1, Math.ceil(total / perPage));
   const safePage = Math.min(Math.max(1, page), totalPages);
   const start = (safePage - 1) * perPage;
-  const slice = filtered.slice(start, start + perPage);
+  const slice = priced.slice(start, start + perPage);
 
-  let items = slice.map((p) => toCard(p, stocks));
+  let items = slice.map((p) => toCard(p, stocks, ctx, mode));
   if (sort === "stock-desc") {
     items = [...items].sort((a, b) => (b.stockDisplay ?? -1) - (a.stockDisplay ?? -1));
   }
@@ -143,20 +218,24 @@ export function listProducts(params: ListParams): ListResult {
   };
 }
 
-export function getProductDetail(idOrSlug: string): ProductDetail | null {
+export function getProductDetail(idOrSlug: string, mode: StockMode = stockMode()): ProductDetail | null {
   const product = findProduct(idOrSlug);
   if (!product) return null;
-  return toDetail(product, componentStocks());
+  return toDetail(product, componentStocks(), overlay(), mode);
 }
 
 export function featuredProducts(limit = 8): ProductCard[] {
+  const ctx = overlay();
   const stocks = componentStocks();
   const list = getCatalog();
 
   // Kurasi diturunkan dari data ERP: SKU rakitan (BOM) lebih dulu, lalu single
   // dengan sisa stok terbesar. Tidak ada SKU yang dipaku di kode.
-  const available = (p: Product) =>
-    Math.max(0, p.stockOnHand - getSold(p.materialCode ?? p.sku));
+  const available = (p: Product) => {
+    const hit = ctx.live ? ctx.lookup(p) : null;
+    if (hit) return Math.max(0, hit.stock);
+    return Math.max(0, p.stockOnHand - getSold(p.materialCode ?? p.sku));
+  };
 
   const bundles = list.filter((p) => p.isBundle && p.components.length > 0);
   const singles = list
@@ -165,7 +244,7 @@ export function featuredProducts(limit = 8): ProductCard[] {
     .sort((a, b) => available(b) - available(a));
 
   const picks = [...bundles, ...singles].slice(0, limit);
-  return picks.map((p) => toCard(p, stocks));
+  return picks.map((p) => toCard(p, stocks, ctx));
 }
 
 export type StockCheckLine = {
@@ -180,6 +259,7 @@ export function checkStock(lines: Array<{ sku: string; qty: number }>): {
   lines: StockCheckLine[];
   ok: boolean;
 } {
+  const ctx = overlay();
   const stocks = componentStocks();
   const products = findProductsBySkus(lines.map((l) => l.sku));
 
@@ -188,7 +268,13 @@ export function checkStock(lines: Array<{ sku: string; qty: number }>): {
     if (!product) {
       return { sku: line.sku, requested: line.qty, available: null, ok: false, error: "SKU tidak ditemukan" };
     }
-    const resolved = resolveStockDisplay(product, stocks);
+    const source = withLive(product, ctx);
+    const resolved = resolveStockDisplay(
+      source,
+      stocks,
+      stockMode(),
+      ctx.live ? () => 0 : getSold,
+    );
     if (resolved.error) {
       return { sku: line.sku, requested: line.qty, available: null, ok: false, error: resolved.error };
     }
