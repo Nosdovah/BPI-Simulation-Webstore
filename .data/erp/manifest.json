@@ -1,61 +1,23 @@
 {
   "contract": "perpack-replica",
-  "fetched_at": "2026-10-29T14:54:52.127Z",
+  "fetched_at": "2026-10-31T11:03:20.521Z",
   "base_url": "https://web-production-e60b55.up.railway.app",
-  "checksum": "094a46ae234e01e34373a1d4075fdde95fed1f4c0fa43344a3ab6a947f423f37",
+  "checksum": "04124a4ddeb39ed495a16784762ee434d3483d10e8fc6d62a77ffa9b0f4a326b",
   "counts": {
-    "products": 3727,
-    "variants": 3727,
+    "products": 3712,
+    "variants": 3712,
     "groups": 302,
     "warehouses": 2,
     "channels": 10,
-    "bundles": 3039
+    "bundles": 3024
   },
   "integrity": {
-    "catalog_count_expected": 3727,
-    "catalog_count_actual": 3727,
+    "catalog_count_expected": 3712,
+    "catalog_count_actual": 3712,
     "catalog_pagination_complete": true,
-    "duplicate_skus": [
-      "M766-AquacDigi-20ml-A2",
-      "M767-AquacDigi-30ml-A2",
-      "M768-AquacDigi-50ml-A2",
-      "M1050-Veroz-20ml-A3",
-      "M1051-Veroz-30ml-A3",
-      "M1052-Veroz-50ml-A3",
-      "M990-PinkyChiffony-20ml-A3",
-      "M992-PinkyChiffony-50ml-A3",
-      "M991-PinkyChiffony-30ml-A3",
-      "M874-SavageMen-20ml-A2",
-      "M875-SavageMen-30ml-A2",
-      "M876-SavageMen-50ml-A2",
-      "M886-EnglandFreshPear-20ml-B2",
-      "M942-NzoBalinese-20ml-B3",
-      "M944-NzoBalinese-50ml-B3"
-    ],
-    "bundles_without_components": [
-      "M990-PinkyChiffony-20ml-A3",
-      "M992-PinkyChiffony-50ml-A3"
-    ],
-    "missing_components": [
-      {
-        "sku": "GamuciGardenia+KingRaffi-30ml-A1",
-        "missing": [
-          "M927-GamuciGardenia-30ml-A1"
-        ]
-      },
-      {
-        "sku": "GamuciGardenia2pcs-30ml-A1",
-        "missing": [
-          "M927-GamuciGardenia-30ml-A1"
-        ]
-      },
-      {
-        "sku": "M927-GamuciGardenia-30ml-C1",
-        "missing": [
-          "M927-GamuciGardenia-30ml-A1"
-        ]
-      }
-    ],
+    "duplicate_skus": [],
+    "bundles_without_components": [],
+    "missing_components": [],
     "missing_price": [
       "ZF30M",
       "3pcsElixirOne+BlackOpm20ml-A1",
@@ -73,22 +35,23 @@
     ],
     "negative_stock": [],
     "bundle_stock_summary": {
-      "total_bundles": 3039,
+      "total_bundles": 3024,
       "oversell": 1,
       "understate": 916,
-      "matched": 2122
+      "matched": 2107
     },
     "warehouse_breakdown_available": true
   },
   "previous": {
-    "fetched_at": "2026-10-27T16:23:55.898Z",
-    "checksum": "f9f5c05c651d0e52a54221d30d186ad25d92767ead486d0dfb2b7e2e60863d7b",
+    "fetched_at": "2026-10-31T10:53:51.290Z",
+    "checksum": "2e7f6050047aeb0c7160b256ee5221ce1be72124642f1578a13d121c9d7a1108",
     "counts": {
-      "products": 3696,
-      "balances": 3664,
-      "boms": 1,
-      "warehouses": 3,
-      "operational": 0
+      "products": 3712,
+      "variants": 3712,
+      "groups": 302,
+      "warehouses": 2,
+      "channels": 10,
+      "bundles": 3024
     }
   }
 }
