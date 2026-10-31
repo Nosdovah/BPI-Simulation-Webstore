@@ -5,6 +5,9 @@ import { verifyPassword } from "@/lib/auth/password";
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession } from "@/lib/auth/session";
 import { isAdminRole } from "@/lib/auth/rbac";
 import { toPublicUser } from "@/lib/auth/types";
+import { clearGuestCookie, GUEST_PREFIX, readGuestId } from "@/lib/cart-owner";
+import { mergeCarts } from "@/lib/cart-server";
+import { pushTelemetry } from "@/lib/state";
 
 /**
  * POST /api/auth/login
@@ -99,6 +102,24 @@ export async function POST(request: Request) {
 
   await touchLogin(user.id);
 
+  /* ------------------------------------------------- keranjang tamu ---
+   * Tamu boleh mengisi keranjang sebelum masuk. Saat login berhasil, isi
+   * keranjang tamu dipindahkan ke keranjang akun (qty dijumlahkan, dijepit 99)
+   * dan cookie tamu dihapus. Kegagalan penggabungan TIDAK boleh menggagalkan
+   * login — pengguna tetap masuk, hanya barangnya tidak berpindah, dan kejadian
+   * itu dicatat ke telemetri supaya kelihatan.
+   */
+  let mergedItems = 0;
+  const guestId = readGuestId();
+  if (guestId) {
+    try {
+      mergedItems = await mergeCarts(`${GUEST_PREFIX}${guestId}`, user.id);
+    } catch (err) {
+      pushTelemetry({ event: "cart_merge_failed", uid: user.id, error: String(err) });
+    }
+    clearGuestCookie();
+  }
+
   const token = signSession({
     uid: user.id,
     email: user.email,
@@ -122,5 +143,6 @@ export async function POST(request: Request) {
     ok: true,
     user: toPublicUser(user),
     redirectTo: isAdminRole(user.primaryRole) ? "/admin" : "/akun",
+    cart: { mergedItems },
   });
 }

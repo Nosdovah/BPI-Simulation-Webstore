@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-/** Form masuk. Setelah sukses, diarahkan sesuai role (admin → /admin, customer → /akun). */
+/**
+ * Form masuk. Setelah sukses, diarahkan ke `next` (kalau ada — mis. kembali ke
+ * /checkout setelah keranjang tamu digabung), selain itu sesuai role
+ * (admin → /admin, customer → /akun).
+ */
 
 const DEMO_ACCOUNTS = [
   { email: "superadmin@octarine.test", password: "Super#2026", role: "Super Admin" },
@@ -14,7 +18,7 @@ const DEMO_ACCOUNTS = [
   { email: "customer@octarine.test", password: "Customer#2026", role: "Customer" },
 ];
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,12 +40,19 @@ export function LoginForm() {
         ok: boolean;
         message?: string;
         redirectTo?: string;
+        cart?: { mergedItems?: number };
       };
       if (!res.ok || !data.ok) {
         setError(data.message ?? "Gagal masuk.");
         return;
       }
-      router.push(data.redirectTo ?? "/akun");
+      // `next` menang atas redirect bawaan role: pengguna yang datang dari
+      // gerbang checkout harus kembali ke checkout, bukan ke /akun.
+      const target =
+        next && next.startsWith("/") && !next.startsWith("//")
+          ? next
+          : data.redirectTo ?? "/akun";
+      router.push(target);
       router.refresh();
     } catch {
       setError("Tidak dapat menghubungi server.");

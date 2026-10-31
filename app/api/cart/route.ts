@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentSession } from "@/lib/auth/guard";
+import { resolveCartOwner } from "@/lib/cart-owner";
 import { findProductsBySkus } from "@/lib/catalog";
 import { checkStock } from "@/lib/core";
 import { pushTelemetry } from "@/lib/state";
@@ -7,17 +7,25 @@ import { cartBackend, clampQty, mutateCart, readCart, type CartMutation } from "
 import type { CartLine } from "@/lib/types";
 
 /**
- * /api/cart — keranjang server-side.
+ * /api/cart — keranjang server-side, tamu DAN pengguna.
  *
- * Semua operasi butuh sesi webstore (cookie `osr_session`). Tamu ditolak 401,
- * bukan diberi keranjang anonim: kebijakan RBAC v1.1 mengunci keranjang untuk
- * tamu, dan keranjang anonim hanya menambah jalur data yang harus dibersihkan.
+ * Kebijakan toko (disamakan dengan octarine.co.id):
+ *   - tamu BOLEH menambah, mengubah jumlah, dan menghapus barang;
+ *   - masuk baru diwajibkan saat checkout (`/checkout` dan `POST /api/orders`).
+ *
+ * Pemilik keranjang ditentukan `resolveCartOwner()`:
+ *   sesi ada  → owner_id = uid pengguna
+ *   sesi tidak ada → owner_id = guest:<uuid dari cookie bertanda tangan>
  *
  * Yang TIDAK dipercaya dari klien:
  *   - harga  → selalu dari katalog ERP (snapshot), bukan dari body
  *   - stok   → divalidasi `checkStock` setiap penambahan
  *   - qty    → dijepit ke 1..99
+ *   - owner  → hanya dari cookie bertanda tangan HMAC, tidak dari body/header
  *   - isi keranjang saat checkout → dibaca dari server, bukan dari body
+ *
+ * Cookie tamu hanya diterbitkan pada operasi TULIS. Pengunjung yang cuma
+ * melihat-lihat tidak dibuatkan baris di database.
  */
 
 export const dynamic = "force-dynamic";
@@ -30,22 +38,6 @@ type CartLineView = CartLine & {
   isBundle: boolean;
   stock: { ok: boolean; available: number | null; error: string | null };
 };
-
-function requireOwner(): { owner: string } | { error: NextResponse } {
-  const session = currentSession();
-  if (!session) {
-    return {
-      error: NextResponse.json(
-        {
-          error: "AUTH_REQUIRED",
-          message: "Masuk dulu untuk memakai keranjang.",
-        },
-        { status: 401 },
-      ),
-    };
-  }
-  return { owner: session.uid };
-}
 
 /** Tempelkan data katalog ke baris keranjang — satu query untuk semua SKU. */
 function decorate(lines: CartLine[]): { lines: CartLineView[]; subtotalIdr: number; count: number } {
@@ -84,15 +76,27 @@ function decorate(lines: CartLine[]): { lines: CartLineView[]; subtotalIdr: numb
 }
 
 export async function GET() {
-  const gate = requireOwner();
-  if ("error" in gate) return gate.error;
+  // Baca: jangan terbitkan cookie baru untuk pengunjung yang belum belanja.
+  const who = resolveCartOwner({ create: false });
+
+  if (!who.owner) {
+    return NextResponse.json({
+      ok: true,
+      backend: cartBackend(),
+      guest: true,
+      lines: [],
+      subtotalIdr: 0,
+      count: 0,
+    });
+  }
 
   try {
-    const lines = await readCart(gate.owner);
+    const lines = await readCart(who.owner);
     const payload = decorate(lines);
     return NextResponse.json({
       ok: true,
       backend: cartBackend(),
+      guest: who.kind === "guest",
       ...payload,
     });
   } catch (err) {
@@ -105,8 +109,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const gate = requireOwner();
-  if ("error" in gate) return gate.error;
+  const who = resolveCartOwner({ create: true });
 
   const body = (await request.json().catch(() => ({}))) as { sku?: string; qty?: number };
   const sku = typeof body.sku === "string" ? body.sku.trim() : "";
@@ -121,7 +124,7 @@ export async function POST(request: Request) {
 
   // Validasi stok atas TOTAL setelah penambahan, bukan hanya delta-nya.
   try {
-    const before = await readCart(gate.owner);
+    const before = await readCart(who.owner);
     const existing = before.find((l) => l.sku === sku)?.qty ?? 0;
     const total = Math.min(99, existing + qty);
     const check = checkStock([{ sku, qty: total }]);
@@ -151,12 +154,11 @@ export async function POST(request: Request) {
     // Validasi gagal bukan alasan menolak pengguna; backend tetap dicoba.
   }
 
-  return applyMutation(gate.owner, { op: "add", sku, qty });
+  return applyMutation(who.owner, who.kind, { op: "add", sku, qty });
 }
 
 export async function PATCH(request: Request) {
-  const gate = requireOwner();
-  if ("error" in gate) return gate.error;
+  const who = resolveCartOwner({ create: true });
 
   const body = (await request.json().catch(() => ({}))) as { sku?: string; qty?: number };
   const sku = typeof body.sku === "string" ? body.sku.trim() : "";
@@ -170,7 +172,7 @@ export async function PATCH(request: Request) {
   }
 
   if (raw <= 0) {
-    return applyMutation(gate.owner, { op: "remove", sku });
+    return applyMutation(who.owner, who.kind, { op: "remove", sku });
   }
 
   const qty = clampQty(raw);
@@ -192,25 +194,32 @@ export async function PATCH(request: Request) {
     // lanjut
   }
 
-  return applyMutation(gate.owner, { op: "set", sku, qty });
+  return applyMutation(who.owner, who.kind, { op: "set", sku, qty });
 }
 
 export async function DELETE(request: Request) {
-  const gate = requireOwner();
-  if ("error" in gate) return gate.error;
+  const who = resolveCartOwner({ create: false });
+  if (!who.owner) {
+    return NextResponse.json({ ok: true, backend: cartBackend(), guest: true, lines: [], subtotalIdr: 0, count: 0 });
+  }
 
   const sku = new URL(request.url).searchParams.get("sku")?.trim();
   const action: CartMutation = sku ? { op: "remove", sku } : { op: "clear" };
-  return applyMutation(gate.owner, action);
+  return applyMutation(who.owner, who.kind, action);
 }
 
-async function applyMutation(owner: string, action: CartMutation): Promise<NextResponse> {
+async function applyMutation(
+  owner: string,
+  kind: "user" | "guest",
+  action: CartMutation,
+): Promise<NextResponse> {
   try {
     const lines = await mutateCart(owner, action);
     const payload = decorate(lines);
     return NextResponse.json({
       ok: true,
       backend: cartBackend(),
+      guest: kind === "guest",
       action: action.op,
       ...payload,
     });

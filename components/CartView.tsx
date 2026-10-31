@@ -186,6 +186,11 @@ export function CartView() {
           Lanjut ke checkout
         </Link>
 
+        <p className="mt-3 text-[10px] leading-relaxed text-smoke">
+          Barang bisa dikumpulkan tanpa akun. Saat checkout kamu akan diminta
+          masuk — isi keranjang ikut pindah ke akunmu.
+        </p>
+
         {problems.length ? (
           <p className="mt-3 text-[11px] text-alert">
             Ada {problems.length} baris bermasalah. Perbaiki jumlah dulu.

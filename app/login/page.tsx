@@ -7,24 +7,40 @@ import { isAdminRole } from "@/lib/auth/rbac";
 export const metadata: Metadata = { title: "Masuk — Octarine" };
 export const dynamic = "force-dynamic";
 
+/** Hanya izinkan tujuan internal (`/...`), supaya `?next=` tidak jadi open redirect. */
+function safeNext(next: string | undefined): string | null {
+  if (!next) return null;
+  if (!next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
+
 /**
- * Halaman masuk. Kalau sesi sudah ada, langsung dilempar ke halaman
- * sesuai role — tidak ada gunanya menampilkan form lagi.
+ * Halaman masuk. Kalau sesi sudah ada, langsung dilempar ke tujuan:
+ * `?next=` kalau ada (mis. kembali ke /checkout), kalau tidak sesuai role.
+ *
+ * `?reason=cart` dipakai gerbang checkout: pengguna diberi tahu bahwa ia
+ * memang perlu akun untuk menyelesaikan pesanan, bukan gagal tanpa alasan.
  */
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams?: { status?: string };
+  searchParams?: { status?: string; next?: string; reason?: string };
 }) {
+  const next = safeNext(searchParams?.next);
   const session = currentSession();
-  if (session) redirect(session.roles.some(isAdminRole) ? "/admin" : "/akun");
+  if (session) {
+    if (next) redirect(next);
+    redirect(session.roles.some(isAdminRole) ? "/admin" : "/akun");
+  }
 
   const notice =
     searchParams?.status === "suspended"
       ? "Akun Anda dinonaktifkan. Hubungi Super Admin untuk mengaktifkan kembali."
       : searchParams?.status === "pending"
         ? "Akun Anda masih menunggu persetujuan Super Admin."
-        : null;
+        : searchParams?.reason === "cart"
+          ? "Masuk dulu untuk menyelesaikan pesanan. Isi keranjangmu ikut pindah ke akun."
+          : null;
 
   return (
     <div className="py-12">
@@ -42,7 +58,7 @@ export default function LoginPage({
         </div>
       )}
 
-      <LoginForm />
+      <LoginForm next={next ?? undefined} />
     </div>
   );
 }

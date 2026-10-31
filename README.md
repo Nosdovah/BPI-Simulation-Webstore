@@ -63,7 +63,44 @@ ERP REST API ──npm run erp:sync──► .data/erp/catalog.snapshot.json ─
 Kontrak integrasi aktif ada di `docs/KONTRAK_API_ERP.md`; versi acuan resmi dan
 panduan koneksi lama diarsipkan di `docs/arsip/`.
 
-## 5. Struktur
+## 5. Keranjang & akun (Supabase)
+
+Keranjang **server-side**, bukan localStorage. Isi keranjang hidup di tabel
+`osr_cart` / `osr_cart_item` dan dibaca lewat route handler `/api/cart`, jadi satu
+keranjang terlihat sama di semua tab, semua perangkat, dan semua instance
+serverless.
+
+Kebijakan toko (disamakan dengan `octarine.co.id`):
+
+- **Tamu boleh belanja** — menambah barang, mengubah jumlah, menghapus.
+- **Checkout wajib masuk** — `POST /api/orders` menolak tamu dengan `401
+  AUTH_REQUIRED`. Halaman `/checkout` menampilkan gerbang masuk sambil tetap
+  memperlihatkan isi keranjang di kolom kanan.
+- **Keranjang ikut pindah saat masuk** — begitu login sukses, isi keranjang tamu
+  digabung ke keranjang akun (qty dijumlahkan, dijepit 99) lalu baris tamu
+  dihapus, semuanya dalam satu RPC atomik `osr_cart_merge`.
+
+Identitas pemilik:
+
+| Pemilik | `owner_id` | Sumber |
+|---|---|---|
+| Pengguna | `<uid sesi>` | cookie `osr_session` (HMAC) |
+| Tamu | `guest:<uuid>` | cookie `osr_guest` (HMAC, 30 hari) |
+
+Cookie tamu **ditandatangani** — tanpa itu, siapa pun yang tahu sebuah id bisa
+membaca dan mengubah keranjang orang lain. Cookie hanya diterbitkan pada operasi
+tulis, jadi pengunjung yang cuma melihat-lihat tidak dibuatkan baris di database.
+
+Keamanan data: RLS menyala tanpa policy, sehingga `anon` key ditolak total.
+Hanya `service_role` (dipakai di server, bukan di bundle klien) yang bisa lewat.
+Migrasi: `supabase/migrations/20261031000100_cart.sql` (tabel + RPC) dan
+`20261031000300_cart_guest.sql` (penggabungan keranjang tamu + housekeeping).
+
+Membersihkan keranjang kedaluwarsa: `select public.osr_cart_reap();` — keranjang
+tamu berumur >30 hari dibuang apa pun isinya; keranjang pengguna hanya dibuang
+kalau sudah kosong.
+
+## 6. Struktur
 
 ```
 app/
@@ -90,14 +127,20 @@ scripts/
   verify.mjs               smoke test
 ```
 
-## 6. Catatan keamanan
+## 7. Catatan keamanan
 
 - `OSR_ORDER_SECRET` wajib diganti di deployment; token order ditandatangani HMAC.
+- `osr_session` dan `osr_guest` ditandatangani HMAC; `osr_guest` hanya berisi UUID
+  acak (tanpa data pribadi) dan tidak bisa dipakai untuk menebak keranjang orang
+  lain. Keduanya `httpOnly`.
+- `SUPABASE_SERVICE_ROLE_KEY` hanya boleh ada di server. Jangan pernah memberi
+  prefix `NEXT_PUBLIC_`; kalau bocor ke bundle klien, RLS keranjang jadi tidak
+  berarti.
 - Webhook butuh bearer token (`OSR_WEBHOOK_TOKEN`) dan opsional
   `X-OSR-Signature: sha256=<hmac>`; tanpa secret, signature tidak diwajibkan.
 - `robots: noindex, nofollow` aktif agar tidak terindeks mesin pencari.
 
-## 7. Dokumentasi
+## 8. Dokumentasi
 
 | Dokumen | Isi |
 |---|---|

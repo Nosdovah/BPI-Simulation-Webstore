@@ -249,3 +249,47 @@ export async function consumeCart(owner: string): Promise<void> {
   }
   await mutateCart(owner, { op: "clear" });
 }
+
+/**
+ * Gabungkan keranjang `from` (tamu) ke `to` (pengguna), lalu hapus yang tamu.
+ * Dipanggil setelah login berhasil.
+ *
+ * Di Supabase dikerjakan satu RPC (`osr_cart_merge`) supaya atomik: tidak ada
+ * jendela waktu di mana barang sudah hilang dari keranjang tamu tetapi belum
+ * masuk ke keranjang akun. Aturannya: qty dijumlahkan dan dijepit 99.
+ *
+ * Return: jumlah SKU yang berpindah (0 kalau tidak ada yang perlu digabung).
+ */
+export async function mergeCarts(from: string, to: string): Promise<number> {
+  if (!from || !to || from === to) return 0;
+
+  if (sbConfig()) {
+    const moved = await sbFetch<number>("/rest/v1/rpc/osr_cart_merge", {
+      method: "POST",
+      body: JSON.stringify({ p_from: from, p_to: to }),
+    });
+    return Number(moved ?? 0);
+  }
+
+  const source = await readCart(from);
+  if (source.length === 0) return 0;
+  const target = await readCart(to);
+  const merged = new Map<string, number>();
+  for (const line of [...target, ...source]) {
+    merged.set(line.sku, Math.min(MAX_QTY, (merged.get(line.sku) ?? 0) + line.qty));
+  }
+  const lines = Array.from(merged.entries())
+    .map(([sku, qty]) => ({ sku, qty }))
+    .sort((a, b) => a.sku.localeCompare(b.sku));
+
+  const store = readFileStore();
+  if (resolveFile()) {
+    store[to] = { lines, updatedAt: new Date().toISOString() };
+    delete store[from];
+    writeFileStore(store);
+  } else {
+    memoryStore.set(to, lines);
+    memoryStore.delete(from);
+  }
+  return source.length;
+}

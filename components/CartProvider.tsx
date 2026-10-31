@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import type { CartLine } from "@/lib/types";
 import { cartCount, checkoutKey } from "@/lib/cart";
 
@@ -13,10 +12,12 @@ import { cartCount, checkoutKey } from "@/lib/cart";
  * respons server. Konsekuensinya: dua perangkat, dua tab, dan dua instance
  * serverless melihat isi yang sama.
  *
- * Operasi tulis mengembalikan `CartActionResult`, sehingga pemanggil bisa
- * membedakan tiga hal yang tampak sama di UI: berhasil, stok tidak cukup,
- * dan belum masuk. Tamu diarahkan ke /login, bukan dibiarkan menekan tombol
- * yang tidak melakukan apa-apa.
+ * Tamu BOLEH memakai keranjang. Server menandai pemiliknya sendiri lewat
+ * cookie `osr_guest` (bertanda tangan), jadi tidak ada satu pun id pemilik
+ * yang dikirim dari sini — kalau ada, itu berarti kebocoran.
+ *
+ * `AUTH_REQUIRED` hanya muncul saat checkout (POST /api/orders). Di titik itu
+ * pemanggil yang mengarahkan pengguna ke /login dengan `?next=`, bukan provider.
  */
 
 export type CartActionResult =
@@ -30,6 +31,7 @@ type CartContextValue = {
   ready: boolean;
   busy: boolean;
   backend: string | null;
+  guest: boolean;
   lastError: string | null;
   add: (sku: string, qty?: number) => Promise<CartActionResult>;
   setQty: (sku: string, qty: number) => Promise<CartActionResult>;
@@ -41,6 +43,7 @@ type CartContextValue = {
 type ApiPayload = {
   ok?: boolean;
   backend?: string;
+  guest?: boolean;
   lines?: CartLine[];
   subtotalIdr?: number;
   error?: string;
@@ -84,17 +87,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [subtotalIdr, setSubtotalIdr] = useState(0);
   const [backend, setBackend] = useState<string | null>(null);
+  const [guest, setGuest] = useState(true);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
-  const router = useRouter();
-  const pathname = usePathname();
   const inflight = useRef(false);
 
   const apply = useCallback((data: ApiPayload) => {
     if (Array.isArray(data.lines)) setLines(data.lines);
     if (typeof data.subtotalIdr === "number") setSubtotalIdr(data.subtotalIdr);
     if (typeof data.backend === "string") setBackend(data.backend);
+    if (typeof data.guest === "boolean") setGuest(data.guest);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -150,10 +153,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           apply(data);
           setLastError(null);
         } else {
+          // Tidak ada auto-redirect: tamu memang boleh menambah barang.
+          // Pengalihan ke /login hanya terjadi di checkout.
           setLastError(result.message);
-          if (result.error === "AUTH_REQUIRED") {
-            router.push(`/login?next=${encodeURIComponent(pathname || "/cart")}&reason=cart`);
-          }
         }
         return result;
       } catch {
@@ -165,7 +167,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setBusy(false);
       }
     },
-    [apply, pathname, router],
+    [apply],
   );
 
   const add = useCallback((sku: string, qty = 1) => run("POST", { sku, qty }), [run]);
@@ -181,6 +183,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       ready,
       busy,
       backend,
+      guest,
       lastError,
       add,
       setQty,
@@ -188,7 +191,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       clear,
       refresh,
     }),
-    [lines, subtotalIdr, ready, busy, backend, lastError, add, setQty, remove, clear, refresh],
+    [lines, subtotalIdr, ready, busy, backend, guest, lastError, add, setQty, remove, clear, refresh],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

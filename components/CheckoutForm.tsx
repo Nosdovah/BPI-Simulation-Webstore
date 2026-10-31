@@ -126,6 +126,12 @@ export function CheckoutForm() {
       const data = await res.json();
 
       if (!res.ok) {
+        if (res.status === 401) {
+          // Sesi habis / belum masuk: kirim ke gerbang masuk dengan tujuan balik
+          // ke checkout. Isi keranjang tetap di server, jadi tidak hilang.
+          router.push("/login?next=%2Fcheckout&reason=cart");
+          return;
+        }
         if (res.status === 409) {
           setConflict(
             (data.lines ?? []).filter((l: { ok: boolean }) => !l.ok),

@@ -3,7 +3,7 @@ import { addSold, pushTelemetry } from "@/lib/state";
 import { findProductsBySkus, findProduct } from "@/lib/catalog";
 import { checkStock } from "@/lib/core";
 import { currentSession } from "@/lib/auth/guard";
-import { consumeCart } from "@/lib/cart-server";
+import { consumeCart, readCart } from "@/lib/cart-server";
 import {
   applyErpPush,
   buildOrder,
@@ -39,10 +39,40 @@ const COURIER_COST: Record<string, number> = {
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as Payload;
 
-  const rawItems = (body.items ?? []).filter(
-    (i): i is { sku: string; qty: number } =>
-      typeof i?.sku === "string" && Number(i?.qty) > 0,
-  );
+  /* --------------------------------------------------------- gerbang ---
+   * Checkout WAJIB masuk. Tamu boleh mengisi keranjang, tetapi pesanan hanya
+   * dibuat untuk pemilik akun: ini yang membuat riwayat pesanan bisa dilacak
+   * dan retur/komplain punya pemilik yang jelas.
+   */
+  const session = currentSession();
+  if (!session) {
+    return NextResponse.json(
+      {
+        error: "AUTH_REQUIRED",
+        message: "Masuk dulu untuk menyelesaikan pesanan. Keranjangmu tetap tersimpan.",
+      },
+      { status: 401 },
+    );
+  }
+
+  /* Isi keranjang dibaca dari SERVER, bukan dari body. Body hanya dipakai
+   * sebagai cadangan kalau keranjang server kosong (mis. pemanggilan API
+   * langsung untuk pengujian kontrak). */
+  let rawItems: Array<{ sku: string; qty: number }>;
+  try {
+    const serverLines = await readCart(session.uid);
+    const source = serverLines.length > 0 ? serverLines : (body.items ?? []);
+    rawItems = source.filter(
+      (i): i is { sku: string; qty: number } =>
+        typeof i?.sku === "string" && Number(i?.qty) > 0,
+    );
+  } catch (err) {
+    pushTelemetry({ event: "cart_read_failed", stage: "checkout", error: String(err) });
+    return NextResponse.json(
+      { error: "CART_BACKEND_ERROR", message: "Keranjang tidak bisa dibaca." },
+      { status: 503 },
+    );
+  }
 
   if (rawItems.length === 0) {
     return NextResponse.json(
@@ -195,16 +225,13 @@ export async function POST(request: Request) {
   rememberOrder(order);
 
   /* Keranjang server-side dikosongkan setelah order benar-benar tercatat.
-   * Hanya untuk pengguna yang punya sesi: checkout tamu tidak menyentuh
-   * keranjang siapa pun. Kegagalan di sini tidak membatalkan order — order
-   * sudah sah, keranjang hanya perlu dibersihkan. */
-  const session = currentSession();
-  if (session) {
-    try {
-      await consumeCart(session.uid);
-    } catch (err) {
-      pushTelemetry({ event: "cart_consume_failed", ref: order.ref, error: String(err) });
-    }
+   * Pemiliknya sudah pasti sesi (gerbang di atas), jadi tidak ada cabang
+   * "tamu" di sini. Kegagalan di sini tidak membatalkan order — order sudah
+   * sah, keranjang hanya perlu dibersihkan. */
+  try {
+    await consumeCart(session.uid);
+  } catch (err) {
+    pushTelemetry({ event: "cart_consume_failed", ref: order.ref, error: String(err) });
   }
 
   pushTelemetry({
