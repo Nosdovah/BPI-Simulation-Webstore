@@ -59,19 +59,39 @@ function withLive(p: Product, ctx: OverlayCtx): Product {
 }
 
 /**
- * Peta stok komponen. Saat overlay hidup, `getSold()` diabaikan untuk SKU yang
- * ada di overlay — ERP sudah mengurangi stoknya sendiri.
+ * Peta stok komponen untuk resolusi BOM (TO-BE).
+ *
+ * SUMBER KUNCI — temuan A-07
+ *   Versi lama hanya memetakan `materialCode` milik produk SATUAN yang ada di
+ *   snapshot. Komponen BOM di ERP memakai kode varian (mis.
+ *   `M2188-ElixirHomme-50ml-A2`, `8677288521-1753362527282-0`) yang tidak
+ *   selalu punya baris produk satuan sendiri → `map.get()` = undefined → 0 →
+ *   halaman TO-BE menampilkan "BOM MIN n komponen: 0" padahal kapasitas nyata
+ *   ribuan. Perbaikan: seluruh kunci overlay ERP (SKU kanonik, termasuk kode
+ *   komponen) dimasukkan lebih dulu; produk satuan snapshot jadi cadangan.
  */
 export function componentStocks(): ComponentStockMap {
   const ctx = overlay();
   const map: ComponentStockMap = new Map();
-  for (const p of getCatalog()) {
-    if (!p.isBundle && p.materialCode) {
-      const hit = ctx.live ? ctx.lookup(p) : null;
-      const base = hit ? hit.stock : p.stockOnHand;
-      const sold = hit ? 0 : getSold(p.materialCode);
-      map.set(p.materialCode, Math.max(0, base - sold));
+
+  // 1) Otoritas: peta stok ERP apa adanya (3.700+ kunci, termasuk kode komponen).
+  if (ctx.live) {
+    const st = liveStockSync();
+    if (st.index) {
+      for (const [key, entry] of Array.from(st.index)) {
+        map.set(key, Math.max(0, entry.stock));
+      }
     }
+  }
+
+  // 2) Cadangan: produk satuan snapshot (dipakai kalau overlay mati/kosong).
+  for (const p of getCatalog()) {
+    if (p.isBundle || !p.materialCode) continue;
+    if (map.has(p.materialCode)) continue;
+    const hit = ctx.live ? ctx.lookup(p) : null;
+    const base = hit ? hit.stock : p.stockOnHand;
+    const sold = hit ? 0 : getSold(p.materialCode);
+    map.set(p.materialCode, Math.max(0, base - sold));
   }
   return map;
 }
@@ -118,13 +138,19 @@ export function toDetail(
   const card = toCard(p, stocks, ctx, mode);
   const bundleComponents: BundleComponent[] = p.components.map((c) => {
     const componentProduct = findProduct(c.materialCode);
-    const liveHit = ctx.live ? ctx.lookup(componentProduct ?? p) : null;
+    /* Stok komponen SELALU dari peta komponen (kunci = materialCode). Versi
+     * lama memakai `ctx.lookup(componentProduct ?? p)` — kalau produk komponen
+     * tidak ada di snapshot, lookup jatuh ke produk BUNDLE itu sendiri dan
+     * angka stok bundle dipakai sebagai stok komponen (salah, dan menutupi
+     * bug A-07). */
+    const fromMap = stocks.get(c.materialCode);
+    const liveHit = ctx.live && componentProduct ? ctx.lookup(componentProduct) : null;
     return {
       sku: componentProduct?.sku ?? c.materialCode,
       materialCode: c.materialCode,
       name: componentProduct?.name ?? c.materialCode,
       multiplierQty: c.multiplierQty,
-      componentStock: liveHit ? liveHit.stock : stocks.get(c.materialCode) ?? 0,
+      componentStock: liveHit ? liveHit.stock : fromMap ?? 0,
     };
   });
 
@@ -255,12 +281,13 @@ export type StockCheckLine = {
   error: string | null;
 };
 
-export function checkStock(lines: Array<{ sku: string; qty: number }>): {
+export function checkStock(lines: Array<{ sku: string; qty: number }>, modeOverride?: StockMode): {
   lines: StockCheckLine[];
   ok: boolean;
 } {
   const ctx = overlay();
   const stocks = componentStocks();
+  const mode: StockMode = modeOverride ?? stockMode();
   const products = findProductsBySkus(lines.map((l) => l.sku));
 
   const result: StockCheckLine[] = lines.map((line) => {
@@ -272,7 +299,7 @@ export function checkStock(lines: Array<{ sku: string; qty: number }>): {
     const resolved = resolveStockDisplay(
       source,
       stocks,
-      stockMode(),
+      mode,
       ctx.live ? () => 0 : getSold,
     );
     if (resolved.error) {

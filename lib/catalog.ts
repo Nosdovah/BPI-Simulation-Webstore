@@ -1,5 +1,6 @@
 import type { CollectionSlug, Product } from "./types";
 import { loadSnapshotSync } from "./erp/client";
+import { liveCatalogSync, noteApplied } from "./erp/live-catalog";
 import {
   buildCatalogFromSnapshot,
   collectionsOf,
@@ -29,13 +30,50 @@ let cachedById: Map<number, Product> | null = null;
 let cachedBySlug: Map<string, Product> | null = null;
 let cachedByMaterial: Map<string, Product> | null = null;
 
+let appliedFetchAt: number | null = null;
+
+/**
+ * Terapkan overlay master katalog ERP ke objek produk yang sudah dibangun.
+ *
+ * Dilakukan dengan MUTASI di tempat (bukan rebuild array) supaya indeks
+ * `bySku`/`bySlug` yang memegang referensi objek yang sama ikut terbarui —
+ * kalau array dibangun ulang, indeks jadi menunjuk objek lama dan harga di
+ * halaman detail berbeda dengan halaman daftar.
+ *
+ * Biayanya nol untuk mayoritas request: hanya berjalan saat `fetchedAt`
+ * overlay berubah (≤ sekali per TTL 300 detik).
+ */
+function applyCatalogOverlay(): void {
+  if (!cached) return;
+  const st = liveCatalogSync();
+  if (!st.map || st.fetchedAt === null || st.fetchedAt === appliedFetchAt) return;
+
+  let changed = 0;
+  for (const p of cached) {
+    const hit = st.map.get(p.sku);
+    if (!hit) continue;
+    if (hit.sellPrice > 0 && hit.sellPrice !== p.priceIdr) {
+      p.priceIdr = hit.sellPrice;
+      changed += 1;
+    }
+    if (hit.name && hit.name !== p.name) {
+      p.name = hit.name;
+      changed += 1;
+    }
+  }
+  appliedFetchAt = st.fetchedAt;
+  noteApplied(changed);
+}
+
 function load() {
-  if (cached) return;
-  const { source, snapshot } = loadSnapshotSync();
-  const built = buildCatalogFromSnapshot(snapshot, source);
-  cached = built.products;
-  cachedMeta = built.meta;
-  orphanBoms = built.orphanBomSkus;
+  if (!cached) {
+    const { source, snapshot } = loadSnapshotSync();
+    const built = buildCatalogFromSnapshot(snapshot, source);
+    cached = built.products;
+    cachedMeta = built.meta;
+    orphanBoms = built.orphanBomSkus;
+  }
+  applyCatalogOverlay();
 }
 
 export function getCatalog(): Product[] {

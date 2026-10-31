@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { listProducts } from "@/lib/core";
 import { liveStock, stockFreshness } from "@/lib/erp/live-stock";
+import { liveCatalog } from "@/lib/erp/live-catalog";
 import type { Gender } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,8 @@ export async function GET(request: Request) {
 
   // Tunggu maksimal 2 detik: request pertama setelah cold start tetap dapat
   // angka live, tetapi tidak menggantung kalau ERP lambat/down.
-  await liveStock(2000);
+  // Master (nama/harga) + stok dipanaskan bersamaan — dua overlay, satu ERP.
+  await Promise.all([liveStock(2000), liveCatalog(2000)]);
 
   const result = listProducts({
     gender: (url.searchParams.get("gender") as Gender | null) ?? "ALL",
