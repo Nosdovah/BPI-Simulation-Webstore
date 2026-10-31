@@ -251,6 +251,26 @@ export async function consumeCart(owner: string): Promise<void> {
 }
 
 /**
+ * Bersihkan keranjang kedaluwarsa (30 hari).
+ *
+ * Di Supabase dikerjakan `osr_cart_reap()`: keranjang tamu dibuang apa pun
+ * isinya, keranjang pengguna hanya kalau sudah kosong. Di backend file/memori
+ * tidak ada TTL — fungsi ini mengembalikan 0 tanpa efek.
+ *
+ * Return: jumlah baris keranjang yang dihapus.
+ */
+export async function reapCarts(): Promise<number> {
+  if (sbConfig()) {
+    const n = await sbFetch<number>("/rest/v1/rpc/osr_cart_reap", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    return Number(n ?? 0);
+  }
+  return 0;
+}
+
+/**
  * Gabungkan keranjang `from` (tamu) ke `to` (pengguna), lalu hapus yang tamu.
  * Dipanggil setelah login berhasil.
  *

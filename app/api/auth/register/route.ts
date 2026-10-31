@@ -5,6 +5,9 @@ import { validateEmail, validatePassword } from "@/lib/auth/password";
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession } from "@/lib/auth/session";
 import { REGISTERABLE_ROLES, isAdminRole } from "@/lib/auth/rbac";
 import { isRole, toPublicUser, type Role } from "@/lib/auth/types";
+import { clearGuestCookie, GUEST_PREFIX, readGuestId } from "@/lib/cart-owner";
+import { mergeCarts } from "@/lib/cart-server";
+import { pushTelemetry } from "@/lib/state";
 
 /**
  * POST /api/auth/register
@@ -116,11 +119,38 @@ export async function POST(request: Request) {
       maxAge: SESSION_MAX_AGE,
     });
 
+    /* ------------------------------------------------- keranjang tamu ---
+     * Sama seperti jalur login: tamu yang mengisi keranjang lalu MENDAFTAR
+     * tidak boleh kehilangan barangnya. Tanpa blok ini keranjang tamu
+     * tertinggal sebagai baris yatim (`guest:<uuid>`) dan pengguna baru
+     * melihat keranjang kosong padahal baru saja menambahkannya.
+     *
+     * Kegagalan penggabungan TIDAK menggagalkan pendaftaran — akun tetap
+     * dibuat, hanya barangnya tidak berpindah, dan kejadian dicatat ke
+     * telemetri supaya kelihatan.
+     */
+    let mergedItems = 0;
+    const guestId = readGuestId();
+    if (guestId) {
+      try {
+        mergedItems = await mergeCarts(`${GUEST_PREFIX}${guestId}`, created.id);
+      } catch (err) {
+        pushTelemetry({
+          event: "cart_merge_failed",
+          uid: created.id,
+          stage: "register",
+          error: String(err),
+        });
+      }
+      clearGuestCookie();
+    }
+
     return NextResponse.json(
       {
         ok: true,
         user: toPublicUser(created),
         redirectTo: isAdminRole(created.primaryRole) ? "/admin" : "/akun",
+        cart: { mergedItems },
       },
       { status: 201 }
     );
