@@ -66,66 +66,101 @@ export function stockOverlayEnabled(env = process.env): boolean {
   return String(env.OSR_STOCK_OVERLAY ?? "on").toLowerCase() !== "off";
 }
 
-type StockIndexResponse = {
-  data?: {
-    items?: Array<{ sku?: string; stock_available?: number; sell_price?: number; is_bundle?: boolean }>;
-    generated_at?: string;
-    count?: number;
+/** Kunci envelope/metadata yang BUKAN SKU. */
+const NOT_A_SKU = new Set([
+  "items", "skus", "data", "metadata", "count", "generated_at", "total",
+  "page", "length", "total_page", "code", "msg",
+]);
+
+/**
+ * ERP replika mengirim lebih dari satu bentuk untuk stock-index, tergantung
+ * build: (a) `{items:[{sku,stock_available,…}]}`, (b) `{data:{items:[…]}}`,
+ * (c) peta datar `{ "M2291": 9975, … }` — bentuk inilah yang dipakai build
+ * 31 Okt 2026, dan sebelumnya membuat overlay mati dengan pesan
+ * "bentuk respons tidak dikenal". Semua dinormalkan ke Map.
+ */
+export function normalizeStockIndex(payload: unknown): {
+  index: Map<string, LiveStockEntry>;
+  generatedAt: string | null;
+  count: number;
+} {
+  const index = new Map<string, LiveStockEntry>();
+  let generatedAt: string | null = null;
+  let count = 0;
+
+  const put = (sku: unknown, stock: unknown, price?: unknown, bundle?: unknown) => {
+    if (typeof sku !== "string" || sku === "" || NOT_A_SKU.has(sku)) return;
+    index.set(sku, {
+      sku,
+      stock: Number(stock ?? 0) || 0,
+      sellPrice: Number(price ?? 0) || 0,
+      isBundle: Boolean(bundle),
+    });
   };
-};
+
+  const walk = (node: unknown, depth = 0): void => {
+    if (!node || depth > 2) return;
+    if (Array.isArray(node)) {
+      for (const it of node) {
+        if (it && typeof it === "object") {
+          const o = it as Record<string, unknown>;
+          put(o.sku, o.stock_available ?? o.stock ?? o.available ?? o.qty, o.sell_price, o.is_bundle);
+        }
+      }
+      return;
+    }
+    if (typeof node !== "object") return;
+    const o = node as Record<string, unknown>;
+    if (typeof o.generated_at === "string") generatedAt = o.generated_at;
+    if (o.count !== undefined) count = Number(o.count) || count;
+
+    const nested = o.items ?? o.skus ?? o.data;
+    if (nested && typeof nested === "object") {
+      const before = index.size;
+      walk(nested, depth + 1);
+      if (index.size > before) return;
+    }
+    /* peta datar SKU → stok (atau SKU → {stock_available}) */
+    for (const [k, v] of Object.entries(o)) {
+      if (NOT_A_SKU.has(k)) continue;
+      if (typeof v === "number" || (typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v))) {
+        put(k, v);
+      } else if (v && typeof v === "object") {
+        const rec = v as Record<string, unknown>;
+        if (rec.stock_available !== undefined || rec.stock !== undefined) {
+          put(k, rec.stock_available ?? rec.stock, rec.sell_price, rec.is_bundle);
+        }
+      }
+    }
+  };
+
+  walk(payload);
+  return { index, generatedAt, count: count || index.size };
+}
 
 async function pull(depth = 0): Promise<void> {
   const s = store();
   const cfg = resolveErpConfig();
-  const json = (await getJson(cfg, "/api/webhooks/stock-index")) as StockIndexResponse["data"] &
-    Record<string, unknown>;
+  const raw = await getJson(cfg, "/api/webhooks/stock-index");
 
-  /* `getJson` sudah membuka envelope `{code,msg,data}` dan mengembalikan `data`,
-   * tetapi pada beberapa build ERP `data` dibungkus lagi. Tangani keduanya tanpa
-   * menebak: cari array `items` di kedalaman satu. */
-  const payload = (json as unknown as StockIndexResponse["data"]) ?? {};
-  const items = payload.items ?? (json as unknown as { data?: { items?: unknown[] } }).data?.items;
-  if (!Array.isArray(items) || items.length === 0) {
+  const { index, generatedAt, count } = normalizeStockIndex(raw);
+  if (index.size === 0) {
     throw new Error("stock-index kosong / bentuk respons tidak dikenal");
-  }
-
-  const index = new Map<string, LiveStockEntry>();
-  for (const it of items as Array<{ sku?: string; stock_available?: number; sell_price?: number; is_bundle?: boolean }>) {
-    const sku = typeof it?.sku === "string" ? it.sku : null;
-    if (!sku) continue;
-    index.set(sku, {
-      sku,
-      stock: Number(it.stock_available ?? 0) || 0,
-      sellPrice: Number(it.sell_price ?? 0) || 0,
-      isBundle: Boolean(it.is_bundle),
-    });
   }
 
   s.index = index;
   s.fetchedAt = Date.now();
-  s.generatedAt = payload.generated_at ?? null;
+  s.generatedAt = generatedAt;
   s.lastError = null;
 
   /* Satu halaman saja tidak cukup kalau SKU > length default. Hitung dari
    * `count` ERP dan tarik sisanya halaman demi halaman (maks 5, ~20.000 SKU). */
-  const count = Number(payload.count ?? index.size) || index.size;
   if (index.size < count && depth < 5) {
-    const cfg2 = resolveErpConfig();
-    const next = await getJson(cfg2, `/api/webhooks/stock-index?page=${depth + 2}&length=10000`);
-    const moreItems = (next as unknown as { items?: unknown[] })?.items;
-    if (Array.isArray(moreItems)) {
-      for (const it of moreItems as Array<{ sku?: string; stock_available?: number; sell_price?: number; is_bundle?: boolean }>) {
-        const sku = typeof it?.sku === "string" ? it.sku : null;
-        if (!sku) continue;
-        s.index.set(sku, {
-          sku,
-          stock: Number(it.stock_available ?? 0) || 0,
-          sellPrice: Number(it.sell_price ?? 0) || 0,
-          isBundle: Boolean(it.is_bundle),
-        });
-      }
-    }
-    if (moreItems && moreItems.length > 0) await pull(depth + 1);
+    const more = normalizeStockIndex(
+      await getJson(cfg, `/api/webhooks/stock-index?page=${depth + 2}&length=10000`),
+    );
+    for (const [sku, entry] of Array.from(more.index)) s.index.set(sku, entry);
+    if (more.index.size > 0) await pull(depth + 1);
   }
 }
 
