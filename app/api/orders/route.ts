@@ -146,11 +146,15 @@ export async function POST(request: Request) {
    */
   const erp = resolveErpOrderConfig();
   let erpSynced = false;
+  /* Stok yang SUDAH dipotong ERP saat purchase-order diterima. Kosong = ERP
+   * tidak memotong, jadi storefront yang jadi pemilik pengurangan stok. */
+  let erpDeducted: Record<string, number> | null = null;
 
   if (erp.mode === "push") {
     const result = await pushOrder(erp, order);
     applyErpPush(order, result);
     erpSynced = result.ok;
+    erpDeducted = result.stockDeducted ?? null;
 
     pushTelemetry({
       event: result.ok ? "erp_order_pushed" : "erp_order_failed",
@@ -192,7 +196,28 @@ export async function POST(request: Request) {
    * Overlay lokal tetap dicatat untuk tampilan supaya angka langsung turun
    * tanpa menunggu `erp:sync` berikutnya.
    */
-  const stockEvents: Array<{ sku: string; delta: number; ok: boolean; error: string | null }> = [];
+  const stockEvents: Array<{
+    sku: string;
+    delta: number;
+    ok: boolean;
+    skipped?: boolean;
+    reason?: string | null;
+    error: string | null;
+  }> = [];
+
+  /**
+   * Siapa yang memotong stok untuk order ini.
+   *
+   *   auto (default) → ERP kalau ia melaporkan `stock_deducted`; kalau tidak,
+   *                    storefront yang mengirim `stock.updated`.
+   *   erp            → selalu percaya ERP (storefront tidak pernah mengirim).
+   *   storefront     → selalu kirim sendiri (ERP yang memotong akan diabaikan;
+   *                    hanya benar untuk ERP generasi lama yang tidak memotong).
+   *
+   * Tanpa aturan ini, checkout memotong stok DUA KALI pada ERP generasi baru:
+   * jual 2 unit → stok turun 4. Terverifikasi live 31 Okt 2026.
+   */
+  const stockOwner = String(process.env.OSR_ERP_STOCK_OWNER ?? "auto").trim().toLowerCase();
 
   for (const item of items) {
     const product = findProduct(item.sku);
@@ -207,15 +232,36 @@ export async function POST(request: Request) {
 
     for (const line of lines) {
       addSold(line.sku, line.delta);
-      if (erp.mode === "push" && erpSynced && erp.stockOverlay === "webhook") {
-        const res = await pushStockUpdated(erp, line.sku, line.delta);
-        stockEvents.push({
-          sku: line.sku,
-          delta: line.delta,
-          ok: res.ok && res.applied !== false,
-          error: res.error ?? null,
-        });
+
+      const deductedByErp = Number(erpDeducted?.[line.sku] ?? 0);
+      const owesPush =
+        erp.mode === "push" &&
+        erpSynced &&
+        erp.stockOverlay === "webhook" &&
+        stockOwner !== "erp" &&
+        (stockOwner === "storefront" ? true : deductedByErp < line.delta);
+
+      if (!owesPush) {
+        if (deductedByErp > 0) {
+          stockEvents.push({
+            sku: line.sku,
+            delta: line.delta,
+            ok: true,
+            skipped: true,
+            reason: "erp_already_deducted",
+            error: null,
+          });
+        }
+        continue;
       }
+
+      const res = await pushStockUpdated(erp, line.sku, line.delta);
+      stockEvents.push({
+        sku: line.sku,
+        delta: line.delta,
+        ok: res.ok && res.applied !== false,
+        error: res.error ?? null,
+      });
     }
 
     /* Bundle juga punya overlay sendiri (kunci = SKU bundle) untuk mode AS-IS. */

@@ -265,6 +265,16 @@ export type PushOrderResult = {
   productSummary?: string | null;
   note?: string | null;
   error?: string | null;
+  /**
+   * Peta `materialCode -> unit` yang SUDAH dikurangi ERP saat purchase-order
+   * diterima (`data.stock_deducted.deducted` pada respons ERP).
+   *
+   * Ada isinya = ERP adalah pemilik pengurangan stok untuk order ini, sehingga
+   * storefront TIDAK boleh mengirim `stock.updated` lagi. Kalau dikirim juga,
+   * stok turun dua kali (bug yang terverifikasi 31 Okt 2026: jual 2 unit →
+   * stok turun 4).
+   */
+  stockDeducted?: Record<string, number> | null;
   raw?: unknown;
 };
 
