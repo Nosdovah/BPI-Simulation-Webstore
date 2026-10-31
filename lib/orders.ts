@@ -85,6 +85,27 @@ export function recentOrders(limit = 20): Order[] {
     .slice(0, limit);
 }
 
+/* Idempotensi checkout: idempotency_key -> ref. Klik ganda / retry dengan key
+ * yang sama mengembalikan order yang sama, bukan membuat order ganda di ERP. */
+type IdemMemory = Map<string, string>;
+const globalIdem = globalThis as unknown as { __osrIdem?: IdemMemory };
+
+function idemMemory(): IdemMemory {
+  if (!globalIdem.__osrIdem) globalIdem.__osrIdem = new Map();
+  return globalIdem.__osrIdem;
+}
+
+export function findOrderByIdempotencyKey(key: string | null | undefined): Order | null {
+  if (!key) return null;
+  const ref = idemMemory().get(key);
+  return ref ? recallOrder(ref) : null;
+}
+
+export function rememberIdempotencyKey(key: string | null | undefined, ref: string): void {
+  if (!key) return;
+  idemMemory().set(key, ref);
+}
+
 /**
  * Nomor pesanan storefront.
  *

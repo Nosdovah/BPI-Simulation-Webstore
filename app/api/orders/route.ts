@@ -7,7 +7,9 @@ import { consumeCart, readCart } from "@/lib/cart-server";
 import {
   applyErpPush,
   buildOrder,
+  findOrderByIdempotencyKey,
   nextOrderRef,
+  rememberIdempotencyKey,
   rememberOrder,
   signOrder,
 } from "@/lib/orders";
@@ -53,6 +55,37 @@ export async function POST(request: Request) {
       },
       { status: 401 },
     );
+  }
+
+  /* Idempotensi: key yang sama (klik ganda / retry) mengembalikan order lama. */
+  if (body.idempotency_key) {
+    const existing = findOrderByIdempotencyKey(body.idempotency_key);
+    if (existing) {
+      const erpCfg = resolveErpOrderConfig();
+      return NextResponse.json(
+        {
+          ok: true,
+          ref: existing.ref,
+          token: signOrder(existing),
+          order: existing,
+          integration: {
+            lane: "4.2",
+            mode: erpCfg.mode,
+            synced: Boolean(existing.erp?.erpId),
+            contract: existing.erp?.contract ?? null,
+            erp_id: existing.erp?.erpId ?? null,
+            erp_status: existing.erp?.rawStatus ?? null,
+            error: null,
+            degraded: false,
+            stock_overlay: erpCfg.stockOverlay,
+            stock_events: [],
+          },
+          idempotent: true,
+          note: "Idempotensi: mengembalikan order yang sudah dibuat untuk key ini.",
+        },
+        { status: 200 },
+      );
+    }
   }
 
   /* Isi keranjang dibaca dari SERVER, bukan dari body. Body hanya dipakai
@@ -269,6 +302,7 @@ export async function POST(request: Request) {
   }
 
   rememberOrder(order);
+  rememberIdempotencyKey(body.idempotency_key, order.ref);
 
   /* Keranjang server-side dikosongkan setelah order benar-benar tercatat.
    * Pemiliknya sudah pasti sesi (gerbang di atas), jadi tidak ada cabang
