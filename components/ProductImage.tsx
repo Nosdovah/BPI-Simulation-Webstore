@@ -67,11 +67,13 @@ export function ProductImage({
         </div>
       </div>
 
-      {isBundle && (
-        <span className="absolute left-2 top-2 border border-white/70 bg-white/80 px-1.5 py-0.5 text-[8px] uppercase tracking-widest2 text-ink">
-          Bundle
-        </span>
-      )}
+      <span
+        className={`absolute left-2 top-2 border border-white/70 px-1.5 py-0.5 text-[8px] uppercase tracking-widest2 ${
+          isBundle ? "bg-white/80 text-ink" : "bg-white/55 text-ink/55"
+        }`}
+      >
+        {isBundle ? "Bundle" : "Single"}
+      </span>
     </div>
   );
 }
