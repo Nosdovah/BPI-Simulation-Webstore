@@ -1,8 +1,8 @@
 {
   "version": 2,
   "contract": "perpack-replica",
-  "fetched_at": "2026-10-31T15:18:17.063Z",
-  "elapsed_ms": 9821,
+  "fetched_at": "2026-11-01T05:40:12.136Z",
+  "elapsed_ms": 8186,
   "source": {
     "base_url": "https://web-production-e60b55.up.railway.app",
     "endpoints": {
@@ -15,23 +15,24 @@
       "purchaseOrder": "/api/webhooks/purchase-order",
       "wmsEvents": "/api/webhooks/wms",
       "bundleStock": "/api/to-be/bundle-stock",
+      "reconcileOrders": "/api/to-be/reconcile-orders",
       "salesSummary": "/api/to-be/sales-summary"
     },
     "warehouse_stock": true
   },
   "counts": {
-    "products": 3712,
-    "products_raw": 3712,
+    "products": 3711,
+    "products_raw": 3711,
     "duplicates_dropped": 0,
-    "variants": 3712,
+    "variants": 3711,
     "groups": 302,
     "warehouses": 2,
     "channels": 10,
     "bundles": 3024
   },
   "integrity": {
-    "catalog_count_expected": 3712,
-    "catalog_count_actual": 3712,
+    "catalog_count_expected": 3711,
+    "catalog_count_actual": 3711,
     "catalog_pagination_complete": true,
     "duplicate_skus": [],
     "bundles_without_components": [],
@@ -54,15 +55,15 @@
     "negative_stock": [],
     "bundle_stock_summary": {
       "total_bundles": 3024,
-      "oversell": 9,
+      "oversell": 7,
       "understate": 916,
-      "matched": 2099
+      "matched": 2101
     },
     "warehouse_breakdown_available": true,
     "duplicates_dropped": 0,
     "duplicates_dropped_skus": []
   },
-  "checksum": "3754bd29b0bd5da57f133c5493390dfbfb4f9758a7e2eec239774cb081276359",
+  "checksum": "32bcd2294feb1d02daea11d90ab8ad9cb2e8e658e988f47a50b141b28bc8f6d2",
   "data": {
     "products": [
       {
@@ -50558,7 +50559,7 @@
         "is_bundle": false,
         "components": [],
         "images": [],
-        "stock_available": 9975
+        "stock_available": 9972
       },
       {
         "id": 3253,
@@ -50642,7 +50643,7 @@
         "is_bundle": false,
         "components": [],
         "images": [],
-        "stock_available": 11214
+        "stock_available": 11215
       },
       {
         "id": 3259,
@@ -77638,20 +77639,6 @@
         "stock_available": 13934
       },
       {
-        "id": 4286,
-        "product_group_id": 300,
-        "name": "",
-        "sku": "",
-        "sku_code": "",
-        "alias": "",
-        "sell_price": 33222,
-        "purchase_price": 0,
-        "is_bundle": false,
-        "components": [],
-        "images": [],
-        "stock_available": 0
-      },
-      {
         "id": 4287,
         "product_group_id": 378,
         "name": "[ EXCLUSIVE RELEASE ] Octarine - Bundling 3 Botol Parfum 50ml Varian Baru | Parfum Perfume Pria Wanita Tahan Lama BOUJEE+SNCTM+E HOMME",
@@ -80579,7 +80566,7 @@
       }
     ],
     "catalogMeta": {
-      "count": 3712,
+      "count": 3711,
       "pages": 8,
       "complete": true
     },
@@ -93504,7 +93491,7 @@
           {
             "warehouse_id": 8,
             "warehouse_name": "Warehouse Bogor",
-            "available": 11214,
+            "available": 11215,
             "reserved": 0,
             "on_order": 3
           }
@@ -93618,7 +93605,7 @@
           {
             "warehouse_id": 9,
             "warehouse_name": "Warehouse Offline",
-            "available": 9455,
+            "available": 9452,
             "reserved": 0,
             "on_order": 0
           }
@@ -136323,16 +136310,6 @@
         ]
       },
       {
-        "sku": "",
-        "product_group_id": 300,
-        "variation_label": "VARIAN",
-        "variation_value": "QUEEN OF MOROCCO",
-        "weight": 300,
-        "type": "",
-        "is_bundle": false,
-        "stocks": []
-      },
-      {
         "sku": "M2406-Solace-100ml-A1",
         "product_group_id": 300,
         "variation_label": "Aroma",
@@ -170769,7 +170746,7 @@
         "thumbnail": "https://safiro.sgp1.cdn.digitaloceanspaces.com/products/m876-savagemen-50ml-a1/1-jpg",
         "description": "FREE TESTER AKAN DIBERIKAN VARIAN YANG SESUAI JIKA TERDAPAT INFO DALAM CATATAN - Jenis : Eau De Parfum Ketahanan : 6 - 12 Jam ( Tergantung Aktivitras ) Free Bubble Wrap - > Savvage Membawa aroma yang sensual dan dramatis, Savvage membangkitkan sebuah kombinasi wangi ikonik antara kekuatan maskulin dengan rasa manis yang segar dan menyenangkan. - Octarine Parfum Memakai Kandungan Eau De Parfume, Octarine Parfum mempunyai Wangi yang lebih kuat dan tentunya tahan lama Hingga 6 - 12 jam ( tergantung Aktivitas Pemakaian ). - Cara Pakai : 1. Jarak Spray adalah kurang lebih 7 - 15 cm 2. Tekan kepala spray dengan penuh (Jangan setengah tekan) untuk menghindari rembesan, karena penekanan spray yang tidak sempurna mengakibatkan parfum tidak keluar dari ujung spray sepenuhnya, sehingga akan tertahan di dalam spray. - Untuk info lebih lanjut bisa menghubungi kami via chat :) Happy shopping Dear !",
         "brand": "",
-        "variant_count": 58
+        "variant_count": 57
       },
       {
         "id": 299,
@@ -171611,9 +171588,9 @@
     "bundleStock": {
       "summary": {
         "total_bundles": 3024,
-        "oversell": 9,
+        "oversell": 7,
         "understate": 916,
-        "matched": 2099
+        "matched": 2101
       },
       "bundles": [
         {
@@ -180079,13 +180056,13 @@
           "sku": "Sanctum+EOne-20ml-A1",
           "is_bundle": true,
           "stock_as_is": 7042,
-          "stock_to_be": 9975,
-          "phantom": -2933,
+          "stock_to_be": 9972,
+          "phantom": -2930,
           "components": [
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2287-ElixirOne-20ml-A1",
@@ -180098,8 +180075,8 @@
           "sku": "Boujee+Sanctum+EOne-20ml-A1",
           "is_bundle": true,
           "stock_as_is": 7042,
-          "stock_to_be": 9975,
-          "phantom": -2933,
+          "stock_to_be": 9972,
+          "phantom": -2930,
           "components": [
             {
               "component_sku": "M2286-BoujeeFluff-20ml-A1",
@@ -180109,7 +180086,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2287-ElixirOne-20ml-A1",
@@ -180122,13 +180099,13 @@
           "sku": "Sanctum+Noctis+EOne-20ml-A1",
           "is_bundle": true,
           "stock_as_is": 7042,
-          "stock_to_be": 9975,
-          "phantom": -2933,
+          "stock_to_be": 9972,
+          "phantom": -2930,
           "components": [
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -180146,8 +180123,8 @@
           "sku": "Boujee+Sanctum+Noctis+EOne-20ml-A1",
           "is_bundle": true,
           "stock_as_is": 7042,
-          "stock_to_be": 9975,
-          "phantom": -2933,
+          "stock_to_be": 9972,
+          "phantom": -2930,
           "components": [
             {
               "component_sku": "M2286-BoujeeFluff-20ml-A1",
@@ -180162,7 +180139,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -181970,7 +181947,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2288-ElixirHomme-20ml-A1",
@@ -181994,7 +181971,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2288-ElixirHomme-20ml-A1",
@@ -182013,7 +181990,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -182037,7 +182014,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2287-ElixirOne-20ml-A1",
@@ -182076,7 +182053,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -182105,7 +182082,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -182129,7 +182106,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2287-ElixirOne-20ml-A1",
@@ -182153,7 +182130,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -185249,7 +185226,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 5,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "CharmBucket-Bundling2",
@@ -185861,7 +185838,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 3,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "CharmBucket-Bundling2",
@@ -185874,8 +185851,8 @@
           "sku": "Boujee+Sanctum-20ml-A1",
           "is_bundle": true,
           "stock_as_is": 9206,
-          "stock_to_be": 9975,
-          "phantom": -769,
+          "stock_to_be": 9972,
+          "phantom": -766,
           "components": [
             {
               "component_sku": "M2286-BoujeeFluff-20ml-A1",
@@ -185885,7 +185862,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             }
           ]
         },
@@ -185893,8 +185870,8 @@
           "sku": "Boujee+Sanctum+Noctis-20ml-A1",
           "is_bundle": true,
           "stock_as_is": 9206,
-          "stock_to_be": 9975,
-          "phantom": -769,
+          "stock_to_be": 9972,
+          "phantom": -766,
           "components": [
             {
               "component_sku": "M2286-BoujeeFluff-20ml-A1",
@@ -185904,7 +185881,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -186238,7 +186215,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 2,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "CharmBucket-Bundling2",
@@ -186794,7 +186771,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "CharmBucket-Bundling2",
@@ -186813,7 +186790,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "CharmBucket-Bundling2",
@@ -186837,7 +186814,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2288-ElixirHomme-20ml-A1",
@@ -186861,7 +186838,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -186890,7 +186867,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -186924,7 +186901,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "CharmBucket-Bundling2",
@@ -186953,7 +186930,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "CharmBucket-Bundling2",
@@ -186977,7 +186954,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -187001,7 +186978,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -187030,7 +187007,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2287-ElixirOne-20ml-A1",
@@ -187059,7 +187036,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 1,
-              "stock": 9975
+              "stock": 9972
             },
             {
               "component_sku": "M2292-NoctisObscura-20ml-A1",
@@ -188822,25 +188799,6 @@
           ]
         },
         {
-          "sku": "Sanctum+Noctis-20ml-A1",
-          "is_bundle": true,
-          "stock_as_is": 9879,
-          "stock_to_be": 9975,
-          "phantom": -96,
-          "components": [
-            {
-              "component_sku": "M2291-SanctumArcanum-20ml-A1",
-              "multiplier": 1,
-              "stock": 9975
-            },
-            {
-              "component_sku": "M2292-NoctisObscura-20ml-A1",
-              "multiplier": 1,
-              "stock": 15770
-            }
-          ]
-        },
-        {
           "sku": "21VpMen+VanillaLaice-50ml-A1",
           "is_bundle": true,
           "stock_as_is": 323,
@@ -188856,6 +188814,25 @@
               "component_sku": "M1048-VanillaLaice-50ml-A2",
               "multiplier": 1,
               "stock": 416
+            }
+          ]
+        },
+        {
+          "sku": "Sanctum+Noctis-20ml-A1",
+          "is_bundle": true,
+          "stock_as_is": 9879,
+          "stock_to_be": 9972,
+          "phantom": -93,
+          "components": [
+            {
+              "component_sku": "M2291-SanctumArcanum-20ml-A1",
+              "multiplier": 1,
+              "stock": 9972
+            },
+            {
+              "component_sku": "M2292-NoctisObscura-20ml-A1",
+              "multiplier": 1,
+              "stock": 15770
             }
           ]
         },
@@ -189856,6 +189833,62 @@
           ]
         },
         {
+          "sku": "M2291-SanctumArcanum-20ml-A1",
+          "is_bundle": true,
+          "stock_as_is": 9976,
+          "stock_to_be": 9972,
+          "phantom": 4,
+          "components": [
+            {
+              "component_sku": "M2291-SanctumArcanum-20ml-A1",
+              "multiplier": 1,
+              "stock": 9972
+            }
+          ]
+        },
+        {
+          "sku": "Sanctum5pcs-20ml-A1",
+          "is_bundle": true,
+          "stock_as_is": 9976,
+          "stock_to_be": 9972,
+          "phantom": 4,
+          "components": [
+            {
+              "component_sku": "M2291-SanctumArcanum-20ml-A1",
+              "multiplier": 1,
+              "stock": 9972
+            }
+          ]
+        },
+        {
+          "sku": "M2291-A1",
+          "is_bundle": true,
+          "stock_as_is": 9976,
+          "stock_to_be": 9972,
+          "phantom": 4,
+          "components": [
+            {
+              "component_sku": "M2291-SanctumArcanum-20ml-A1",
+              "multiplier": 1,
+              "stock": 9972
+            }
+          ]
+        },
+        {
+          "sku": "Sanctum2pcs-20ml-A1",
+          "is_bundle": true,
+          "stock_as_is": 4988,
+          "stock_to_be": 4986,
+          "phantom": 2,
+          "components": [
+            {
+              "component_sku": "M2291-SanctumArcanum-20ml-A1",
+              "multiplier": 2,
+              "stock": 9972
+            }
+          ]
+        },
+        {
           "sku": "3pcsElixirOne-Free20ml-A1",
           "is_bundle": true,
           "stock_as_is": 57405,
@@ -190555,34 +190588,6 @@
           ]
         },
         {
-          "sku": "M2291-SanctumArcanum-20ml-A1",
-          "is_bundle": true,
-          "stock_as_is": 9976,
-          "stock_to_be": 9975,
-          "phantom": 1,
-          "components": [
-            {
-              "component_sku": "M2291-SanctumArcanum-20ml-A1",
-              "multiplier": 1,
-              "stock": 9975
-            }
-          ]
-        },
-        {
-          "sku": "Sanctum2pcs-20ml-A1",
-          "is_bundle": true,
-          "stock_as_is": 4988,
-          "stock_to_be": 4987,
-          "phantom": 1,
-          "components": [
-            {
-              "component_sku": "M2291-SanctumArcanum-20ml-A1",
-              "multiplier": 2,
-              "stock": 9975
-            }
-          ]
-        },
-        {
           "sku": "Noctis2pcs-20ml-A1",
           "is_bundle": true,
           "stock_as_is": 7884,
@@ -190593,6 +190598,20 @@
               "component_sku": "M2292-NoctisObscura-20ml-A1",
               "multiplier": 2,
               "stock": 15770
+            }
+          ]
+        },
+        {
+          "sku": "Sanctum3pcs-20ml-A1",
+          "is_bundle": true,
+          "stock_as_is": 3325,
+          "stock_to_be": 3324,
+          "phantom": 1,
+          "components": [
+            {
+              "component_sku": "M2291-SanctumArcanum-20ml-A1",
+              "multiplier": 3,
+              "stock": 9972
             }
           ]
         },
@@ -190772,20 +190791,6 @@
           ]
         },
         {
-          "sku": "Sanctum5pcs-20ml-A1",
-          "is_bundle": true,
-          "stock_as_is": 9976,
-          "stock_to_be": 9975,
-          "phantom": 1,
-          "components": [
-            {
-              "component_sku": "M2291-SanctumArcanum-20ml-A1",
-              "multiplier": 1,
-              "stock": 9975
-            }
-          ]
-        },
-        {
           "sku": "Noctis5pcs-20ml-A1",
           "is_bundle": true,
           "stock_as_is": 3153,
@@ -190837,7 +190842,7 @@
             {
               "component_sku": "M2291-SanctumArcanum-20ml-A1",
               "multiplier": 4,
-              "stock": 9975
+              "stock": 9972
             }
           ]
         },
@@ -190852,62 +190857,6 @@
               "component_sku": "M2292-NoctisObscura-20ml-A1",
               "multiplier": 4,
               "stock": 15770
-            }
-          ]
-        },
-        {
-          "sku": "M2291-A1",
-          "is_bundle": true,
-          "stock_as_is": 9976,
-          "stock_to_be": 9975,
-          "phantom": 1,
-          "components": [
-            {
-              "component_sku": "M2291-SanctumArcanum-20ml-A1",
-              "multiplier": 1,
-              "stock": 9975
-            }
-          ]
-        },
-        {
-          "sku": "Solace-100ml",
-          "is_bundle": true,
-          "stock_as_is": 11215,
-          "stock_to_be": 11214,
-          "phantom": 1,
-          "components": [
-            {
-              "component_sku": "Solace-100ml",
-              "multiplier": 1,
-              "stock": 11214
-            }
-          ]
-        },
-        {
-          "sku": "M2406-Solace-100ml-A2",
-          "is_bundle": true,
-          "stock_as_is": 11215,
-          "stock_to_be": 11214,
-          "phantom": 1,
-          "components": [
-            {
-              "component_sku": "Solace-100ml",
-              "multiplier": 1,
-              "stock": 11214
-            }
-          ]
-        },
-        {
-          "sku": "M2406-Solace-100ml-A1",
-          "is_bundle": true,
-          "stock_as_is": 11215,
-          "stock_to_be": 11214,
-          "phantom": 1,
-          "components": [
-            {
-              "component_sku": "Solace-100ml",
-              "multiplier": 1,
-              "stock": 11214
             }
           ]
         },
@@ -221890,20 +221839,6 @@
           ]
         },
         {
-          "sku": "Sanctum3pcs-20ml-A1",
-          "is_bundle": true,
-          "stock_as_is": 3325,
-          "stock_to_be": 3325,
-          "phantom": 0,
-          "components": [
-            {
-              "component_sku": "M2291-SanctumArcanum-20ml-A1",
-              "multiplier": 3,
-              "stock": 9975
-            }
-          ]
-        },
-        {
           "sku": "Noctis3pcs-20ml-A1",
           "is_bundle": true,
           "stock_as_is": 5256,
@@ -224207,6 +224142,20 @@
           ]
         },
         {
+          "sku": "Solace-100ml",
+          "is_bundle": true,
+          "stock_as_is": 11215,
+          "stock_to_be": 11215,
+          "phantom": 0,
+          "components": [
+            {
+              "component_sku": "Solace-100ml",
+              "multiplier": 1,
+              "stock": 11215
+            }
+          ]
+        },
+        {
           "sku": "Solace+Serenity-100ml",
           "is_bundle": true,
           "stock_as_is": 10976,
@@ -224221,7 +224170,7 @@
             {
               "component_sku": "Solace-100ml",
               "multiplier": 1,
-              "stock": 11214
+              "stock": 11215
             }
           ]
         },
@@ -224254,7 +224203,7 @@
             {
               "component_sku": "Solace-100ml",
               "multiplier": 1,
-              "stock": 11214
+              "stock": 11215
             }
           ]
         },
@@ -224282,7 +224231,7 @@
             {
               "component_sku": "Solace-100ml",
               "multiplier": 2,
-              "stock": 11214
+              "stock": 11215
             }
           ]
         },
@@ -224296,7 +224245,7 @@
             {
               "component_sku": "Solace-100ml",
               "multiplier": 2,
-              "stock": 11214
+              "stock": 11215
             }
           ]
         },
@@ -224315,7 +224264,7 @@
             {
               "component_sku": "Solace-100ml",
               "multiplier": 1,
-              "stock": 11214
+              "stock": 11215
             }
           ]
         },
@@ -224330,6 +224279,34 @@
               "component_sku": "M2405-Serenity-100ml-A1",
               "multiplier": 2,
               "stock": 10976
+            }
+          ]
+        },
+        {
+          "sku": "M2406-Solace-100ml-A2",
+          "is_bundle": true,
+          "stock_as_is": 11215,
+          "stock_to_be": 11215,
+          "phantom": 0,
+          "components": [
+            {
+              "component_sku": "Solace-100ml",
+              "multiplier": 1,
+              "stock": 11215
+            }
+          ]
+        },
+        {
+          "sku": "M2406-Solace-100ml-A1",
+          "is_bundle": true,
+          "stock_as_is": 11215,
+          "stock_to_be": 11215,
+          "phantom": 0,
+          "components": [
+            {
+              "component_sku": "Solace-100ml",
+              "multiplier": 1,
+              "stock": 11215
             }
           ]
         },
@@ -224356,25 +224333,25 @@
     },
     "salesSummary": {
       "sales_order": {
-        "on_process": 6,
-        "on_picking": 1,
-        "on_packing": 5,
+        "on_process": 9,
+        "on_picking": 0,
+        "on_packing": 6,
         "packed": 60
       },
       "sales_product": {
-        "on_process": 15,
-        "on_picking": 1,
-        "on_packing": 11,
+        "on_process": 18,
+        "on_picking": 0,
+        "on_packing": 12,
         "packed": 154
       },
-      "total_orders": 460,
+      "total_orders": 463,
       "status_counts": {
         "cancelled": 19,
         "completed": 367,
         "packed": 60,
-        "packing": 5,
+        "packing": 6,
+        "paid": 3,
         "pending": 1,
-        "picking": 1,
         "process": 6,
         "returned": 1
       }

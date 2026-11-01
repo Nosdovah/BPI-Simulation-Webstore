@@ -96,39 +96,25 @@ function warehouseStocksOf(variant?: ErpVariant): WarehouseStock[] {
   }));
 }
 
-export function buildCatalogFromSnapshot(
-  snapshot: ErpSnapshot,
-  source: CatalogMeta["source"] = "snapshot",
-): BuiltCatalog {
-  const variantBySku = new Map<string, ErpVariant>();
-  for (const v of snapshot.data.variants ?? []) variantBySku.set(v.sku, v);
-
-  const groupById = new Map<number, ErpGroup>();
-  for (const g of snapshot.data.groups ?? []) groupById.set(Number(g.id), g);
-
-  const bundleStockBySku = new Map<string, ErpBundleStock>();
-  for (const b of snapshot.data.bundleStock?.bundles ?? []) bundleStockBySku.set(b.sku, b);
-
-  const masterSkus = new Set(snapshot.data.products.map((p) => p.sku));
-  const orphanBomSkus: string[] = [];
-
-  const products: Product[] = snapshot.data.products.map((item, index) => {
-    const variant = variantBySku.get(item.sku);
-    const group = groupById.get(Number(item.product_group_id));
-    const bundleStock = bundleStockBySku.get(item.sku);
-
+/**
+ * Bangun satu `Product` dari satu baris master ERP.
+ *
+ * Diekspor supaya overlay master (lib/erp/live-catalog.ts + lib/catalog.ts)
+ * bisa membuat produk untuk SKU yang BARU muncul di master data ERP tanpa
+ * menunggu build ulang. `variant`/`group`/`bundleStock` opsional: kalau snapshot
+ * belum mengenal SKU itu, atribut variasi jatuh ke turunan SKU (tidak dikarang).
+ */
+export function toProduct(
+  item: ErpCatalogItem,
+  variant: ErpVariant | undefined,
+  group: ErpGroup | undefined,
+  bundleStock: ErpBundleStock | undefined,
+  index = 0,
+): Product {
     const components = (Array.isArray(item.components) ? item.components : []).map((c) => ({
       materialCode: c.component_sku,
       multiplierQty: Math.max(1, Math.round(num(c.multiplier_qty, 1))),
     }));
-
-    if (item.is_bundle) {
-      for (const c of components) {
-        if (!masterSkus.has(c.materialCode) && !orphanBomSkus.includes(c.materialCode)) {
-          orphanBomSkus.push(c.materialCode);
-        }
-      }
-    }
 
     const asIs = num(item.stock_available);
     const toBe = item.is_bundle && bundleStock ? num(bundleStock.stock_to_be) : asIs;
@@ -173,6 +159,51 @@ export function buildCatalogFromSnapshot(
               .join(", ")}.`
           : item.name),
     };
+}
+
+export function buildCatalogFromSnapshot(
+  snapshot: ErpSnapshot,
+  source: CatalogMeta["source"] = "snapshot",
+): BuiltCatalog {
+  const variantBySku = new Map<string, ErpVariant>();
+  for (const v of snapshot.data.variants ?? []) variantBySku.set(v.sku, v);
+
+  const groupById = new Map<number, ErpGroup>();
+  for (const g of snapshot.data.groups ?? []) groupById.set(Number(g.id), g);
+
+  const bundleStockBySku = new Map<string, ErpBundleStock>();
+  for (const b of snapshot.data.bundleStock?.bundles ?? []) bundleStockBySku.set(b.sku, b);
+
+  const masterSkus = new Set(snapshot.data.products.map((p) => p.sku));
+  const orphanBomSkus: string[] = [];
+
+  /* A-15: baris tanpa SKU tidak pernah boleh menjadi produk toko.
+   * ERP bisa menghapus varian, tetapi snapshot yang sudah terlanjur dibangun
+   * masih membawanya (terbukti di pass 20/21/22: 1 baris sku "" harga 33.222
+   * masih disajikan storefront walau master ERP 3.711 tanpa baris kosong).
+   * Filter di sini adalah jaring kedua yang bekerja untuk snapshot LAMA,
+   * snapshot baru, maupun mode live. */
+  const rawProducts = (snapshot.data.products ?? []).filter(
+    (p) => Boolean(String(p?.sku ?? "").trim()),
+  );
+
+
+  const products: Product[] = rawProducts.map((item, index) => {
+    const product = toProduct(
+      item,
+      variantBySku.get(item.sku),
+      groupById.get(Number(item.product_group_id)),
+      bundleStockBySku.get(item.sku),
+      index,
+    );
+    if (item.is_bundle) {
+      for (const c of product.components) {
+        if (!masterSkus.has(c.materialCode) && !orphanBomSkus.includes(c.materialCode)) {
+          orphanBomSkus.push(c.materialCode);
+        }
+      }
+    }
+    return product;
   });
 
   return {

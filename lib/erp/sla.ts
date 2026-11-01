@@ -108,15 +108,39 @@ export function summarizeSla(orders: ErpOrderRow[]): SlaSummary {
   };
 }
 
-/** Panggil penyapu resmi ERP. Mengembalikan jumlah `sent_at` yang diisi. */
+/** Panggil penyapu resmi ERP. Mengembalikan jumlah `sent_at` yang diisi +
+ *  jejak order mandek (C-07). Sejak pass 23 ERP menulis setiap order terbuka
+ *  yang melewati SLA ke tabel `order_exceptions`, jadi angka `exceptions_open`
+ *  adalah bukti bahwa tidak ada order berhenti tanpa jejak. */
 export async function reconcileSentAt(
   cfg: ReturnType<typeof resolveErpConfig>,
-): Promise<{ filled: number | null; error: string | null }> {
+): Promise<{
+  filled: number | null;
+  stalled_marked: number | null;
+  exceptions_open: number | null;
+  sla_days: number | null;
+  error: string | null;
+}> {
   try {
     const res = await postJson(cfg, ERP_ENDPOINTS.reconcileOrders, {});
-    const n = Number((res as { data?: { sent_at_filled?: number } })?.data?.sent_at_filled);
-    return { filled: Number.isFinite(n) ? n : null, error: null };
+    const data = (res as {
+      data?: {
+        sent_at_filled?: number;
+        stalled_marked?: number;
+        exceptions_open?: number;
+        sla_days?: number;
+      };
+    })?.data ?? {};
+    const n = Number(data.sent_at_filled);
+    return {
+      filled: Number.isFinite(n) ? n : null,
+      stalled_marked: Number.isFinite(Number(data.stalled_marked)) ? Number(data.stalled_marked) : null,
+      exceptions_open: Number.isFinite(Number(data.exceptions_open)) ? Number(data.exceptions_open) : null,
+      sla_days: Number.isFinite(Number(data.sla_days)) ? Number(data.sla_days) : null,
+      error: null,
+    };
   } catch (err) {
-    return { filled: null, error: err instanceof Error ? err.message : String(err) };
+    return { filled: null, stalled_marked: null, exceptions_open: null, sla_days: null,
+             error: err instanceof Error ? err.message : String(err) };
   }
 }

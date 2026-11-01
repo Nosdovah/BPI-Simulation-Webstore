@@ -36,13 +36,22 @@ export async function GET(request: Request) {
     catalog: {
       configured: catalogSource(),
       source: catalog.source,
+      /** "master" = /api/webhooks/catalog (boleh tambah/hapus item),
+       *  "products" = fallback /v1/products/list (hanya timpa). */
+      mode: catalog.mode,
+      endpoint: catalog.endpoint,
       erp_base_url: catalog.erp_base_url,
       fetched_at: catalog.fetched_at,
       age_seconds: catalog.age_seconds,
       ttl_seconds: catalog.ttl_seconds,
       fresh: catalog.fresh,
       sku_count: catalog.sku_count,
+      master_count: catalog.master_count,
+      complete: catalog.complete,
+      applied: catalog.applied,
       applied_count: catalog.applied_count,
+      /** berapa produk toko yang benar-benar disajikan (setelah tambah/hapus) */
+      items_served: meta.counts?.products ?? null,
       error: catalog.error,
       snapshot: {
         // umur snapshot yang dibundel saat build — batas bawah kesegaran master

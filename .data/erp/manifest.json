@@ -1,21 +1,21 @@
 {
   "contract": "perpack-replica",
-  "fetched_at": "2026-10-31T15:18:17.063Z",
+  "fetched_at": "2026-11-01T05:40:12.136Z",
   "base_url": "https://web-production-e60b55.up.railway.app",
-  "checksum": "3754bd29b0bd5da57f133c5493390dfbfb4f9758a7e2eec239774cb081276359",
+  "checksum": "32bcd2294feb1d02daea11d90ab8ad9cb2e8e658e988f47a50b141b28bc8f6d2",
   "counts": {
-    "products": 3712,
-    "products_raw": 3712,
+    "products": 3711,
+    "products_raw": 3711,
     "duplicates_dropped": 0,
-    "variants": 3712,
+    "variants": 3711,
     "groups": 302,
     "warehouses": 2,
     "channels": 10,
     "bundles": 3024
   },
   "integrity": {
-    "catalog_count_expected": 3712,
-    "catalog_count_actual": 3712,
+    "catalog_count_expected": 3711,
+    "catalog_count_actual": 3711,
     "catalog_pagination_complete": true,
     "duplicate_skus": [],
     "bundles_without_components": [],
@@ -38,24 +38,26 @@
     "negative_stock": [],
     "bundle_stock_summary": {
       "total_bundles": 3024,
-      "oversell": 9,
+      "oversell": 7,
       "understate": 916,
-      "matched": 2099
+      "matched": 2101
     },
     "warehouse_breakdown_available": true,
     "duplicates_dropped": 0,
     "duplicates_dropped_skus": []
   },
   "previous": {
-    "fetched_at": "2026-10-29T14:54:52.127Z",
-    "checksum": "094a46ae234e01e34373a1d4075fdde95fed1f4c0fa43344a3ab6a947f423f37",
+    "fetched_at": "2026-10-31T15:18:17.063Z",
+    "checksum": "3754bd29b0bd5da57f133c5493390dfbfb4f9758a7e2eec239774cb081276359",
     "counts": {
-      "products": 3727,
-      "variants": 3727,
+      "products": 3712,
+      "products_raw": 3712,
+      "duplicates_dropped": 0,
+      "variants": 3712,
       "groups": 302,
       "warehouses": 2,
       "channels": 10,
-      "bundles": 3039
+      "bundles": 3024
     }
   }
 }

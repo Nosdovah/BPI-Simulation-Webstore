@@ -1,12 +1,15 @@
 import type { CollectionSlug, Product } from "./types";
 import { loadSnapshotSync } from "./erp/client";
-import { liveCatalogSync, noteApplied } from "./erp/live-catalog";
+import { liveCatalogSync, noteApplied, type LiveCatalogRow } from "./erp/live-catalog";
+import { reconcileCatalog } from "./catalog-reconcile";
 import {
   buildCatalogFromSnapshot,
   collectionsOf,
   segmentsOf,
+  toProduct,
   type CatalogMeta,
 } from "./erp/mapper";
+import type { ErpBundleStock, ErpGroup, ErpVariant } from "./erp/types";
 
 /* ------------------------------------------------------------------ *
  * Katalog storefront.
@@ -17,6 +20,16 @@ import {
  *
  * Alur:  ERP REST API → npm run erp:sync → snapshot → mapper → Product[]
  *
+ * Sejak pass 27 master data TIDAK LAGI BEKU di snapshot. Snapshot hanya
+ * baseline; overlay master (`lib/erp/live-catalog.ts`, sumber
+ * `GET /api/webhooks/catalog` — endpoint yang sama dengan halaman master data
+ * ERP) merekonsiliasi katalog tiap TTL:
+ *
+ *   - produk di ERP          → nama, harga, flag bundle, komposisi BOM disegarkan
+ *   - SKU baru di ERP        → DITAMBAHKAN sebagai produk toko (tanpa build ulang)
+ *   - SKU dihapus di ERP     → DIHAPUS dari katalog toko (prune ber-guard)
+ *   - stok                   → tetap dari overlay stok live (TTL 30 dtk)
+ *
  * Kalau snapshot belum ada, modul ini melempar error yang menyebutkan
  * perintah perbaikannya — bukan diam-diam memakai data contoh.
  * ------------------------------------------------------------------ */
@@ -25,6 +38,12 @@ let cached: Product[] | null = null;
 let cachedMeta: CatalogMeta | null = null;
 let orphanBoms: string[] = [];
 
+/** baseline dari snapshot — objek produk dipakai ulang, bukan dibangun ulang */
+let base: Product[] | null = null;
+let variantBySku = new Map<string, ErpVariant>();
+let groupById = new Map<number, ErpGroup>();
+let bundleStockBySku = new Map<string, ErpBundleStock>();
+
 let cachedBySku: Map<string, Product> | null = null;
 let cachedById: Map<number, Product> | null = null;
 let cachedBySlug: Map<string, Product> | null = null;
@@ -32,46 +51,65 @@ let cachedByMaterial: Map<string, Product> | null = null;
 
 let appliedFetchAt: number | null = null;
 
+/** Guard prune: jangan pernah menghapus kalau master tidak kelihatan lengkap. */
+const PRUNE_MIN = Number(process.env.OSR_CATALOG_PRUNE_MIN ?? 3000);
+const PRUNE_ON = String(process.env.OSR_CATALOG_PRUNE ?? "on").toLowerCase() !== "off";
+
+function resetIndexes(): void {
+  cachedBySku = null;
+  cachedById = null;
+  cachedBySlug = null;
+  cachedByMaterial = null;
+}
+
 /**
- * Terapkan overlay master katalog ERP ke objek produk yang sudah dibangun.
+ * Rekonsiliasi katalog terhadap master data ERP.
  *
- * Dilakukan dengan MUTASI di tempat (bukan rebuild array) supaya indeks
- * `bySku`/`bySlug` yang memegang referensi objek yang sama ikut terbarui —
- * kalau array dibangun ulang, indeks jadi menunjuk objek lama dan harga di
- * halaman detail berbeda dengan halaman daftar.
- *
- * Biayanya nol untuk mayoritas request: hanya berjalan saat `fetchedAt`
- * overlay berubah (≤ sekali per TTL 300 detik).
+ * Dijalankan tiap kali `fetchedAt` overlay berubah (≤ sekali per TTL 120 dtk),
+ * bukan tiap request. Produk yang tidak berubah tetap memakai objek yang sama
+ * supaya referensi di halaman daftar dan halaman detail konsisten.
  */
 function applyCatalogOverlay(): void {
-  if (!cached) return;
+  if (!base) return;
   const st = liveCatalogSync();
   if (!st.map || st.fetchedAt === null || st.fetchedAt === appliedFetchAt) return;
 
-  let changed = 0;
-  for (const p of cached) {
-    const hit = st.map.get(p.sku);
-    if (!hit) continue;
-    if (hit.sellPrice > 0 && hit.sellPrice !== p.priceIdr) {
-      p.priceIdr = hit.sellPrice;
-      changed += 1;
-    }
-    if (hit.name && hit.name !== p.name) {
-      p.name = hit.name;
-      changed += 1;
-    }
-  }
+  const r = reconcileCatalog(base, st.map, {
+    mode: st.mode,
+    complete: st.complete,
+    pruneOn: PRUNE_ON,
+    pruneMin: PRUNE_MIN,
+    buildProduct: (row, index) =>
+      toProduct(
+        row.item,
+        variantBySku.get(row.sku),
+        groupById.get(Number(row.item.product_group_id)),
+        bundleStockBySku.get(row.sku),
+        index,
+      ),
+  });
+
+  cached = r.products;
+  resetIndexes();
   appliedFetchAt = st.fetchedAt;
-  noteApplied(changed);
+  noteApplied({ updated: r.updated, added: r.added, removed: r.removed });
 }
 
 function load() {
   if (!cached) {
     const { source, snapshot } = loadSnapshotSync();
     const built = buildCatalogFromSnapshot(snapshot, source);
+    base = built.products;
     cached = built.products;
     cachedMeta = built.meta;
     orphanBoms = built.orphanBomSkus;
+
+    variantBySku = new Map();
+    for (const v of snapshot.data.variants ?? []) variantBySku.set(v.sku, v);
+    groupById = new Map();
+    for (const g of snapshot.data.groups ?? []) groupById.set(Number(g.id), g);
+    bundleStockBySku = new Map();
+    for (const b of snapshot.data.bundleStock?.bundles ?? []) bundleStockBySku.set(b.sku, b);
   }
   applyCatalogOverlay();
 }

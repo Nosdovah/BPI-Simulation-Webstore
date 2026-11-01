@@ -44,7 +44,12 @@ export function signOrder(order: Order): string {
 
 export function readOrderToken(token: string | undefined | null): Order | null {
   if (!token || !token.includes(".")) return null;
-  const [payload, mac] = token.split(".");
+  /* C-06: token harus PERSIS dua segmen (`payload.mac`). `split(".")` yang
+   * hanya mengambil dua elemen pertama membuat `payload.mac.extra` diterima
+   * (parser longgar). Tolak eksplisit. */
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [payload, mac] = parts;
   const expected = createHmac("sha256", SECRET).update(payload).digest("hex").slice(0, 16);
   try {
     const a = Buffer.from(mac);

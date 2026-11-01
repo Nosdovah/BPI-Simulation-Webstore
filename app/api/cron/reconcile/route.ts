@@ -44,7 +44,9 @@ async function run(request: Request) {
   const dry = new URL(request.url).searchParams.get("dry") === "1";
   const cfg = resolveErpConfig();
 
-  const reconcile = dry ? { filled: null, error: null } : await reconcileSentAt(cfg);
+  const reconcile = dry
+    ? { filled: null, stalled_marked: null, exceptions_open: null, sla_days: null, error: null }
+    : await reconcileSentAt(cfg);
 
   let orders;
   try {
@@ -66,6 +68,9 @@ async function run(request: Request) {
     ok: true,
     dry_run: dry,
     sent_at_filled: reconcile.filled,
+    stalled_marked: reconcile.stalled_marked,
+    exceptions_open: reconcile.exceptions_open,
+    sla_days: reconcile.sla_days,
     reconcile_error: reconcile.error,
     ...sla,
   });
