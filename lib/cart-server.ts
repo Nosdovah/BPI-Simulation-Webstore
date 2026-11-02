@@ -115,6 +115,43 @@ async function sbRpc(fn: string, body: Record<string, unknown>): Promise<void> {
   });
 }
 
+type SbLine = { sku: string; qty: number };
+
+/**
+ * Mutasi keranjang dalam SATU round-trip (O(1) request, bukan 2).
+ *
+ * RPC `osr_cart_mutate` (migrasi 20261102000100_cart_mutate.sql) menulis lalu
+ * mengembalikan isi keranjang terbaru sebagai jsonb, sehingga route tidak perlu
+ * SELECT susulan. Sebelumnya setiap mutasi = RPC + baca ulang (2 request) dan
+ * POST /api/cart = baca + RPC + baca ulang (3 request).
+ *
+ * Mengembalikan `null` bila fungsi belum ada di database (deployment lama /
+ * rollback) supaya pemanggil bisa jatuh ke jalur lama tanpa error.
+ */
+async function sbMutate(
+  owner: string,
+  action: CartMutation,
+): Promise<CartLine[] | null> {
+  const body: Record<string, unknown> = { p_owner: owner, p_op: action.op };
+  if (action.op !== "clear") body.p_sku = action.sku;
+  if (action.op === "add" || action.op === "set") body.p_qty = clampQty(action.qty, 1);
+
+  let rows: SbLine[] | null;
+  try {
+    rows = await sbFetch<SbLine[]>("/rest/v1/rpc/osr_cart_mutate", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(rows)) return null;
+
+  return rows
+    .map((l) => ({ sku: String(l.sku), qty: clampQty(l.qty) }))
+    .sort((a, b) => a.sku.localeCompare(b.sku));
+}
+
 /* ==================================================================== *
  *  Backend: file / memori
  * ==================================================================== */
@@ -200,6 +237,11 @@ export async function mutateCart(
   action: CartMutation,
 ): Promise<CartLine[]> {
   if (sbConfig()) {
+    // Jalur cepat: satu RPC yang menulis sekaligus mengembalikan isi keranjang.
+    const fast = await sbMutate(owner, action);
+    if (fast !== null) return fast;
+
+    // Jalur lama (database belum punya osr_cart_mutate): RPC + baca ulang.
     if (action.op === "add") {
       await sbRpc("osr_cart_add", { p_owner: owner, p_sku: action.sku, p_qty: clampQty(action.qty) });
     } else if (action.op === "set") {
